@@ -61,6 +61,14 @@ CREATE TABLE IF NOT EXISTS tasks (
     FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- Public student reader (also created automatically on first visit to /news)
+CREATE TABLE IF NOT EXISTS post_reactions (
+    post_id INT NOT NULL, kind VARCHAR(20) NOT NULL, n INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (post_id, kind)
+);
+CREATE TABLE IF NOT EXISTS post_views (post_id INT PRIMARY KEY, n INT NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS poll_votes (option_key VARCHAR(30) PRIMARY KEY, n INT NOT NULL DEFAULT 0);
+
 CREATE TABLE IF NOT EXISTS notifications (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
