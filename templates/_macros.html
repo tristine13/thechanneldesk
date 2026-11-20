@@ -1,0 +1,17 @@
+{% macro status_badge(status) %}
+{% set labels = {'draft': 'Draft', 'pending': 'Pending: News Editor', 'with_eic': 'Pending: Editor-in-Chief',
+'with_adviser': 'Pending: Adviser', 'approved': 'Approved', 'rejected': 'Rejected', 'revise': 'Needs Revision'} %}
+<div class="status {{ (status or 'draft')|lower }}">{{ labels.get(status, 'Draft') }}</div>
+{% endmacro %}
+
+{% macro gallery(images) %}
+{% if images %}
+<div class="gallery n{{ [images|length, 3]|min }}">
+    {% for img in images[:3] %}
+    <img src="{{ url_for('uploads', filename=img) }}" alt="">
+    {% endfor %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro csrf() %}<input type="hidden" name="csrf_token" value="{{ csrf_token }}">{% endmacro %}

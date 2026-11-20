@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block bodyclass %}landing{% endblock %}
+{% block shell %}
+<div class="overlay">
+    <div class="center">
+        <h1 class="logo">The Channel Desk.</h1>
+        <p class="tagline">By Truth,<br>We Shape Lives.</p>
+        {% with msgs = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in msgs %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
+        {% endwith %}
+        <div class="buttons">
+            <a href="{{ url_for('login') }}" class="pill pill-dark">Sign In with Google</a>
+            <a href="{{ url_for('register') }}" class="pill pill-light">Register</a>
+        </div>
+    </div>
+    <div class="footer">
+        The Channel Desk is the official digital workspace of The FBC Channel,
+        designed to streamline the publication’s editorial workflow.
+        It serves as a centralized platform where staff members can submit outputs,
+        collaborate with editors, and receive assignments.
+    </div>
+</div>
+{% endblock %}

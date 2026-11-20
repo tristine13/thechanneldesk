@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf with context %}
+{% block title %}{{ 'Edit' if post else 'Create' }} Output{% endblock %}
+{% block content %}
+<h2 class="timeline-title centered">{{ 'Edit Output' if post else 'Create Output' }}</h2>
+
+{% if task %}
+<div class="flash info center-box">
+    <b>Working on task:</b> {{ task.title }} ({{ task.type }})
+    {% if task.description %}<br>{{ task.description }}{% endif %}
+</div>
+{% endif %}
+
+{% if post and post.feedback and post.status == 'revise' %}
+<div class="flash info center-box"><b>Reviewer feedback:</b> {{ post.feedback }}</div>
+{% endif %}
+
+<form method="POST" enctype="multipart/form-data" class="panel center-panel">
+    {{ csrf() }}
+    {% if task %}<input type="hidden" name="task_id" value="{{ task.id }}">{% endif %}
+
+    <label>Title</label>
+    <input type="text" name="title" value="{{ post.title if post else (task.title if task else '') }}" required>
+
+    <label>Type</label>
+    <select name="type" required>
+        {% for t in post_types %}
+        <option value="{{ t }}" {{ 'selected' if (post and post.type==t) or (not post and task and task.type==t) }}>{{ t
+            }}</option>
+        {% endfor %}
+    </select>
+
+    <label>Content</label>
+    <textarea name="content" rows="12" required>{{ post.content if post else '' }}</textarea>
+
+    <label>Images (optional)</label>
+    <input type="file" name="images" accept="image/*" multiple>
+
+    <div class="form-actions">
+        <button name="action" value="draft" class="btn btn-outline">Save Draft</button>
+        <button name="action" value="submit" class="btn btn-red">Submit for Review</button>
+    </div>
+</form>
+{% endblock %}

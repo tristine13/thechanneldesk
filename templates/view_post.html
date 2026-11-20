@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, csrf with context %}
+{% block title %}{{ post.title }}{% endblock %}
+{% block content %}
+<article class="panel post-panel">
+    <div class="status-row">{{ status_badge(post.status) }}</div>
+    <h1 class="post-title">{{ post.title }}</h1>
+    <div class="muted">by {{ post.author or 'Unknown' }} · {{ post.type }} · {{ post.created_at.strftime('%b %d, %Y') }}
+    </div>
+    {% for img in post.images %}<img class="post-img" src="{{ url_for('uploads', filename=img) }}" alt="">{% endfor %}
+    <div class="post-body">{{ post.content }}</div>
+
+    {% if post.feedback and post.status in ('revise', 'rejected') %}
+    <div class="flash info"><b>Feedback:</b> {{ post.feedback }}</div>
+    {% endif %}
+
+    {% if can_edit %}
+    <div class="form-actions"><a class="btn btn-red" href="{{ url_for('create', post_id=post.id) }}">Edit &amp;
+            Resubmit</a></div>
+    {% endif %}
+
+    {% if can_review %}
+    <form method="POST" action="{{ url_for('review_post', post_id=post.id) }}" class="review-box">
+        {{ csrf() }}
+        <input type="hidden" name="next" value="{{ url_for('view_post', post_id=post.id) }}">
+        <label>Feedback (required for Revise / Reject)</label>
+        <textarea name="feedback" rows="3"></textarea>
+        <div class="form-actions">
+            <button name="action" value="approve" class="btn btn-approve">{{ approve_label }}</button>
+            <button name="action" value="revise" class="btn btn-outline">Revise</button>
+            <button name="action" value="reject" class="btn btn-reject">Reject</button>
+        </div>
+    </form>
+    {% endif %}
+</article>
+{% endblock %}

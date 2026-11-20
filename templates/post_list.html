@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h2 class="timeline-title centered">{{ title }}</h2>
+<div class="list center-list">
+    {% for p in posts %}
+    <div class="row">
+        <div>
+            <b>{{ p.title }}</b>
+            <div class="muted">by {{ p.author or 'Unknown' }} · {{ p.type }} · {{ p.created_at.strftime('%b %d, %Y') }}
+            </div>
+            {% if p.feedback and p.status in ('revise', 'rejected') %}
+            <div class="muted"><b>Feedback:</b> {{ p.feedback }}</div>
+            {% endif %}
+        </div>
+        <div class="row-right">
+            {{ status_badge(p.status) }}
+            <a class="read-more" href="{{ url_for('view_post', post_id=p.id) }}">Open→</a>
+            {% if p.user_id == session.user_id and p.status in EDITABLE_STATUSES %}
+            <a class="read-more" href="{{ url_for('create', post_id=p.id) }}">Edit→</a>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <p class="empty">{{ empty }}</p>
+    {% endfor %}
+</div>
+{% endblock %}

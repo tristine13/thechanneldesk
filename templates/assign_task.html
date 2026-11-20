@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf with context %}
+{% block title %}Assign a Task{% endblock %}
+{% block content %}
+<h2 class="timeline-title">Assign a Task</h2>
+<form method="POST" action="{{ url_for('assign_task') }}" class="panel center-panel">
+    {{ csrf() }}
+    <label>Title</label><input type="text" name="title" required>
+
+    <label>Type of news</label>
+    <select name="type" required>
+        {% for t in task_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+    </select>
+
+    <label>Description</label><textarea name="description" rows="3"></textarea>
+
+    <label>Assign to</label>
+    <select name="assigned_to" required>
+        <option value="">Select a person</option>
+        {% for s in staff %}<option value="{{ s.id }}">{{ s.name }}{% if s.position %} ({{ s.position }}){% endif %}
+        </option>{% endfor %}
+    </select>
+    <div class="form-actions"><button class="btn btn-red">Assign</button></div>
+</form>
+{% endblock %}

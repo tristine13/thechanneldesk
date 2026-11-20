@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ code }}{% endblock %}
+{% block content %}
+<div class="panel" style="text-align:center">
+    <h1 class="post-title">{{ code }}</h1>
+    <p>{{ msg }}</p>
+    <p><a class="read-more" href="{{ url_for('index') }}">←Home</a></p>
+</div>
+{% endblock %}

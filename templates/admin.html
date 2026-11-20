@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf with context %}
+{% block title %}Admin Panel{% endblock %}
+{% block bodyclass %}admin-page{% endblock %}
+{% block content %}
+{% set in_review = post_counts.get('pending', 0) + post_counts.get('with_eic', 0) + post_counts.get('with_adviser', 0) %}
+{% set role_filters = [('editor_in_chief', 'Editor-in-Chief'), ('news_editor', 'News Editor'), ('adviser', 'Adviser'), ('staff', 'Staff')] %}
+
+<div class="adm">
+
+    <div class="adm-top">
+        <h1 class="adm-title">Admin Panel</h1>
+        <div class="adm-top-actions">
+            <a class="adm-link" href="{{ url_for('review_queue') }}">Approvals Dashboard ↗</a>
+            <button type="button" class="adm-btn adm-btn-primary" data-drawer-open>+ Create Member Account</button>
+        </div>
+    </div>
+
+    <section class="adm-sec" aria-labelledby="h-overview">
+        <h2 id="h-overview" class="adm-h2">System Overview</h2>
+        <div class="adm-kpi">
+            <div>
+                <div class="adm-kv k-members">{{ members|length }}</div>
+                <div class="adm-kl">Members</div>
+            </div>
+            <div>
+                <div class="adm-kv k-waiting">{{ pending|length }}</div>
+                <div class="adm-kl">Awaiting Approval</div>
+            </div>
+            <div>
+                <div class="adm-kv k-review">{{ in_review }}</div>
+                <div class="adm-kl">Works in Review</div>
+            </div>
+            <div>
+                <div class="adm-kv k-published">{{ post_counts.get('approved', 0) }}</div>
+                <div class="adm-kl">Published</div>
+            </div>
+            <div>
+                <div class="adm-kv k-revise">{{ post_counts.get('revise', 0) + post_counts.get('rejected', 0) }}</div>
+                <div class="adm-kl">Revise / Rejected</div>
+            </div>
+            <div>
+                <div class="adm-kv k-tasks">{{ task_counts.values()|sum }}</div>
+                <div class="adm-kl">Tasks</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="adm-sec" aria-labelledby="h-pending">
+        <div class="adm-sechead">
+            <h2 id="h-pending" class="adm-h2">Pending Approvals</h2>
+            <span class="adm-count">{{ pending|length }}</span>
+        </div>
+        {% for p in pending %}
+        <div class="adm-alert">
+            <div class="adm-person">
+                <span class="adm-avatar" aria-hidden="true">{{ (p.name.split()|first)[:1]|upper }}{{ (p.name.split()|last)[:1]|upper if p.name.split()|length > 1 }}</span>
+                <div class="adm-person-text">
+                    <div class="adm-pname">{{ p.name }}</div>
+                    <div class="adm-pmail">{{ p.email }}{% if p.position %} • <span class="adm-pill">{{ p.position }}</span>{% endif %}</div>
+                </div>
+            </div>
+            <div class="adm-controls">
+                <form method="POST" action="{{ url_for('admin_verify', reg_id=p.reg_id) }}" class="adm-controls">
+                    {{ csrf() }}
+                    <span class="adm-sel">
+                        <select name="role" aria-label="Role for {{ p.name }}">
+                            {% for r, _ in role_cards %}<option value="{{ r }}" {{ 'selected' if r == 'staff' }}>{{ ROLE_LABELS[r] }}</option>{% endfor %}
+                        </select>
+                    </span>
+                    <button class="adm-btn adm-btn-primary">Approve</button>
+                </form>
+                <form method="POST" action="{{ url_for('admin_delete', reg_id=p.reg_id) }}"
+                    onsubmit="return confirm('Decline {{ p.name|e }}? They will be emailed.')">
+                    {{ csrf() }}<button class="adm-btn adm-btn-ghost">Decline</button>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <div class="adm-empty">No accounts are waiting for approval.</div>
+        {% endfor %}
+    </section>
+
+    <section class="adm-sec" aria-labelledby="h-members">
+        <div class="adm-sechead">
+            <h2 id="h-members" class="adm-h2">Members Directory</h2>
+            <span class="adm-count">{{ members|length }} member{{ 's' if members|length != 1 }}</span>
+        </div>
+
+        <div class="adm-card">
+            <div class="adm-toolbar">
+                <div class="adm-search">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="11" cy="11" r="7" />
+                        <path d="M20 20l-3.5-3.5" />
+                    </svg>
+                    <input type="text" id="adm-q" class="adm-inp" placeholder="Search name, email or position"
+                        aria-label="Search members" autocomplete="off">
+                </div>
+                <span class="adm-sel">
+                    <select id="adm-filter" aria-label="Filter by system role">
+                        <option value="all">All roles ({{ members|length }})</option>
+                        {% for key, label in role_filters %}
+                        <option value="{{ key }}">{{ label }} ({{ members|selectattr('role', 'equalto', key)|list|length }})</option>
+                        {% endfor %}
+                    </select>
+                </span>
+            </div>
+
+            <div class="adm-scroll">
+                <table class="adm-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Member</th>
+                            <th scope="col">Beat / Position</th>
+                            <th scope="col">System Role</th>
+                            <th scope="col" class="adm-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="adm-rows">
+                        {% for m in members %}
+                        <tr data-role="{{ m.role }}"
+                            data-search="{{ (m.name ~ ' ' ~ m.email ~ ' ' ~ (m.position or ''))|lower }}">
+                            <td>
+                                <div class="adm-person">
+                                    <span class="adm-avatar" aria-hidden="true">{{ (m.name.split()|first)[:1]|upper }}{{ (m.name.split()|last)[:1]|upper if m.name.split()|length > 1 }}</span>
+                                    <div class="adm-person-text">
+                                        <div class="adm-pname">{{ m.name }}</div>
+                                        <div class="adm-pmail">{{ m.email }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>{% if m.position %}<span class="adm-pill">{{ m.position }}</span>{% else %}<span class="adm-dash">–</span>{% endif %}</td>
+                            <td>
+                                <form method="POST" action="{{ url_for('admin_role', user_id=m.user_id) }}">
+                                    {{ csrf() }}
+                                    <span class="adm-sel adm-sel-quiet">
+                                        <select name="role" aria-label="System role for {{ m.name }}"
+                                            onchange="this.form.submit()">
+                                            {% if m.role not in ASSIGNABLE_ROLES %}<option value="" disabled selected>Select a role</option>{% endif %}
+                                            {% for r, _ in role_cards %}<option value="{{ r }}" {{ 'selected' if m.role == r }}>{{ ROLE_LABELS[r] }}</option>{% endfor %}
+                                        </select>
+                                    </span>
+                                </form>
+                            </td>
+                            <td class="adm-right">
+                                <form method="POST" action="{{ url_for('admin_delete', reg_id=m.reg_id) }}"
+                                    onsubmit="return confirm('Remove {{ m.name|e }}? Their posts will be deleted too.')">
+                                    {{ csrf() }}<button class="adm-rm">Remove</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <div class="adm-none" id="adm-none" {{ 'hidden' if members }}>{{ 'No approved members yet.' if not members else 'No members match this search.' }}</div>
+            </div>
+        </div>
+    </section>
+</div>
+
+{# ---------------- slide-over: Create Member Account ---------------- #}
+<div class="adm-drawer {{ 'open' if open_drawer }}" id="adm-drawer" aria-hidden="{{ 'false' if open_drawer else 'true' }}">
+    <div class="adm-backdrop" data-drawer-close></div>
+    <aside class="adm-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+        <form method="POST" action="{{ url_for('admin_create') }}" novalidate class="adm-form">
+            {{ csrf() }}
+            <div class="adm-dhead">
+                <div>
+                    <h2 id="drawer-title" class="adm-h2">Create Member Account</h2>
+                    <p class="adm-sub">The account is approved straight away. You stay on this page.</p>
+                </div>
+                <button type="button" class="adm-iconbtn" aria-label="Close" data-drawer-close>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="adm-dbody">
+                <div class="adm-field">
+                    <label class="adm-lbl" for="f-name">Full Name</label>
+                    <input id="f-name" name="name" type="text" autocomplete="off" placeholder="e.g. Maria Santos"
+                        value="{{ form.name or '' }}" class="adm-inp {{ 'bad' if errors.name }}">
+                    {% if errors.name %}<p class="adm-err">{{ errors.name }}</p>{% endif %}
+                </div>
+
+                <div class="adm-field">
+                    <label class="adm-lbl" for="f-email">Institutional Email</label>
+                    <input id="f-email" name="email" type="text" inputmode="email" autocomplete="off"
+                        placeholder="surname_firstname{{ domain }}" value="{{ form.email or '' }}"
+                        class="adm-inp {{ 'bad' if errors.email }}">
+                    {% if errors.email %}<p class="adm-err">{{ errors.email }}</p>{% endif %}
+                    <p class="adm-hint">Must end in {{ domain }}</p>
+                </div>
+
+                <div class="adm-field">
+                    <label class="adm-lbl" for="f-pos">Editorial Beat / Position</label>
+                    <input id="f-pos" name="position" type="text" autocomplete="off" maxlength="60"
+                        placeholder="e.g. Writer" value="{{ form.position or '' }}"
+                        class="adm-inp {{ 'bad' if errors.position }}">
+                    <div class="adm-chips">
+                        {% for s in position_suggestions %}<button type="button" class="adm-chip" data-pos="{{ s }}">{{ s }}</button>{% endfor %}
+                    </div>
+                    {% if errors.position %}<p class="adm-err">{{ errors.position }}</p>{% endif %}
+                </div>
+
+                <div class="adm-field">
+                    <span class="adm-lbl">System Role</span>
+                    {% set chosen = form.role or 'staff' %}
+                    <div class="adm-dd" id="role-dd">
+                        <button type="button" class="adm-dd-btn" aria-haspopup="true" aria-expanded="false"
+                            aria-controls="role-dd-menu">
+                            <span class="adm-dd-cur">
+                                {% for r, desc in role_cards if r == chosen %}
+                                <span class="adm-rt" id="role-dd-label">{{ ROLE_LABELS[r] }}</span>
+                                <span class="adm-rd" id="role-dd-desc">{{ desc }}</span>
+                                {% endfor %}
+                            </span>
+                            <span class="adm-dd-chev" aria-hidden="true"></span>
+                        </button>
+                        <div class="adm-dd-wrap">
+                            <div class="adm-dd-menu" id="role-dd-menu" role="radiogroup" aria-label="System role">
+                                {% for r, desc in role_cards %}
+                                <label class="adm-role {{ 'on' if chosen == r }}" data-label="{{ ROLE_LABELS[r] }}"
+                                    data-desc="{{ desc }}">
+                                    <input type="radio" name="role" value="{{ r }}" {{ 'checked' if chosen == r }}>
+                                    <span>
+                                        <span class="adm-rt">{{ ROLE_LABELS[r] }}</span>
+                                        <span class="adm-rd">{{ desc }}</span>
+                                    </span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% set send = form.send if form else true %}
+                <label class="adm-toggle">
+                    <span>
+                        <span class="adm-tl">Email sign-in instructions to the member</span>
+                        <span class="adm-rd">Sent to the institutional email above. They sign in with Google.</span>
+                    </span>
+                    <input type="checkbox" role="switch" name="send_email" class="adm-switch" {{ 'checked' if send }}>
+                </label>
+            </div>
+
+            <div class="adm-dfoot">
+                <button type="button" class="adm-btn adm-btn-line" data-drawer-close>Cancel</button>
+                <button type="submit" class="adm-btn adm-btn-primary">Create Account</button>
+            </div>
+        </form>
+    </aside>
+</div>
+
+<script>
+    (function () {
+        var drawer = document.getElementById('adm-drawer');
+        var lastFocus = null;
+
+        function openDrawer() {
+            lastFocus = document.activeElement;
+            drawer.classList.add('open');
+            drawer.setAttribute('aria-hidden', 'false');
+            setTimeout(function () { var f = document.getElementById('f-name'); if (f) f.focus(); }, 60);
+        }
+        function closeDrawer() {
+            drawer.classList.remove('open');
+            drawer.setAttribute('aria-hidden', 'true');
+            if (lastFocus && lastFocus.focus) lastFocus.focus();
+        }
+        document.querySelectorAll('[data-drawer-open]').forEach(function (b) { b.addEventListener('click', openDrawer); });
+        document.querySelectorAll('[data-drawer-close]').forEach(function (b) { b.addEventListener('click', closeDrawer); });
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape') return;
+            var d = document.getElementById('role-dd');
+            if (d && d.classList.contains('open')) { d.classList.remove('open'); d.querySelector('.adm-dd-btn').setAttribute('aria-expanded', 'false'); return; }
+            if (drawer.classList.contains('open')) closeDrawer();
+        });
+
+        // position quick-picks
+        var pos = document.getElementById('f-pos');
+        document.querySelectorAll('[data-pos]').forEach(function (c) {
+            c.addEventListener('click', function () { pos.value = c.getAttribute('data-pos'); pos.focus(); });
+        });
+        // system role dropdown: shows the chosen role + summary, opens to the four options
+        var dd = document.getElementById('role-dd');
+        var ddBtn = dd.querySelector('.adm-dd-btn');
+        function setDd(open) { dd.classList.toggle('open', open); ddBtn.setAttribute('aria-expanded', open); }
+        ddBtn.addEventListener('click', function () { setDd(!dd.classList.contains('open')); });
+        dd.querySelectorAll('.adm-role input').forEach(function (r) {
+            r.addEventListener('change', function () {
+                var card = r.closest('.adm-role');
+                dd.querySelectorAll('.adm-role').forEach(function (l) { l.classList.toggle('on', l === card); });
+                document.getElementById('role-dd-label').textContent = card.getAttribute('data-label');
+                document.getElementById('role-dd-desc').textContent = card.getAttribute('data-desc');
+                setDd(false);
+                ddBtn.focus();
+            });
+        });
+
+        // members: search + role filter (client-side)
+        var q = document.getElementById('adm-q'), sel = document.getElementById('adm-filter');
+        var rows = document.querySelectorAll('#adm-rows tr'), none = document.getElementById('adm-none');
+        function apply() {
+            var term = q.value.trim().toLowerCase(), role = sel.value, shown = 0;
+            rows.forEach(function (tr) {
+                var ok = (role === 'all' || tr.dataset.role === role) && (!term || tr.dataset.search.indexOf(term) > -1);
+                tr.hidden = !ok;
+                if (ok) shown++;
+            });
+            if (rows.length) { none.hidden = shown > 0; none.textContent = 'No members match this search.'; }
+        }
+        q.addEventListener('input', apply);
+        sel.addEventListener('change', apply);
+    })();
+</script>
+{% endblock %}

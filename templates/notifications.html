@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block content %}
+<h2 class="timeline-title">Notifications</h2>
+<div class="list">
+    {% for n in rows %}
+    {% if n.reference_type == 'post' and n.reference_id %}{% set href = url_for('view_post', post_id=n.reference_id) %}
+    {% elif n.reference_type == 'task' %}{% set href = url_for('my_tasks') %}
+    {% elif n.type == 'announcement' %}{% set href = url_for('announcements') %}
+    {% elif n.type == 'registration' %}{% set href = url_for('admin') %}
+    {% else %}{% set href = None %}{% endif %}
+    <div class="row {{ '' if n.is_read else 'unread' }}">
+        <div>
+            {% if href %}<a href="{{ href }}">{{ n.message }}</a>{% else %}{{ n.message }}{% endif %}
+            <div class="muted">{{ n.created_at.strftime('%b %d, %Y %I:%M %p') }}</div>
+        </div>
+    </div>
+    {% else %}<p class="empty">You're all caught up.</p>{% endfor %}
+</div>
+{% endblock %}

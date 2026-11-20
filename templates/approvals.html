@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, csrf with context %}
+{% block title %}Approvals{% endblock %}
+{% block content %}
+
+{% macro work_row(p) %}
+<div class="row">
+    <div>
+        <b>{{ p.title }}</b>
+        <div class="muted">by {{ p.author or 'Unknown' }} · {{ p.type }} · {{ p.created_at.strftime('%b %d, %Y') }}
+        </div>
+        {% if p.feedback and p.status in ('revise', 'rejected') %}
+        <div class="muted"><b>Feedback:</b> {{ p.feedback }}</div>
+        {% endif %}
+    </div>
+    <div class="row-right">
+        {{ status_badge(p.status) }}
+        <a class="read-more" href="{{ url_for('view_post', post_id=p.id) }}">Open→</a>
+    </div>
+    {% if p.can_act %}
+    <form method="POST" action="{{ url_for('review_post', post_id=p.id) }}" class="review-inline">
+        {{ csrf() }}
+        <input type="text" name="feedback" placeholder="Feedback (required for Revise / Reject)">
+        <button name="action" value="approve" class="btn btn-approve">{{ APPROVE_LABELS[p.status] }}</button>
+        <button name="action" value="revise" class="btn btn-outline">Revise</button>
+        <button name="action" value="reject" class="btn btn-reject">Reject</button>
+    </form>
+    {% endif %}
+</div>
+{% endmacro %}
+
+<h2 class="timeline-title centered">Approvals Dashboard</h2>
+<p class="flow-note">Staff → News Editor → Editor-in-Chief → Adviser → Published</p>
+
+{% if waiting %}
+<div class="waiting-banner">{{ waiting }} work{{ 's' if waiting != 1 }} waiting for your approval</div>
+{% endif %}
+
+<div class="stat-grid">
+    {% for key, label in stages %}
+    <div class="stat">
+        <div class="stat-num">{{ counts[key] }}</div>
+        <div>{{ label }}</div>
+    </div>
+    {% endfor %}
+    {% if show_outcomes %}
+    <div class="stat">
+        <div class="stat-num">{{ counts.approved }}</div>
+        <div>Approved</div>
+    </div>
+    <div class="stat">
+        <div class="stat-num">{{ counts.revise }}</div>
+        <div>Needs Revision</div>
+    </div>
+    <div class="stat">
+        <div class="stat-num">{{ counts.rejected }}</div>
+        <div>Rejected</div>
+    </div>
+    {% endif %}
+</div>
+
+{% for key, label, rows in sections %}
+<h3 class="section-title">{{ label }} <span class="count-pill">{{ rows|length }}</span></h3>
+<div class="list center-list">
+    {% for p in rows %}{{ work_row(p) }}{% else %}<p class="empty">Nothing here.</p>{% endfor %}
+</div>
+{% endfor %}
+
+{% for key, label, rows in outcomes %}
+<h3 class="section-title">{{ label }} <span class="count-pill">{{ counts[key] }}</span></h3>
+<div class="list center-list">
+    {% for p in rows %}{{ work_row(p) }}{% else %}<p class="empty">Nothing here.</p>{% endfor %}
+</div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, gallery %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h2 class="timeline-title">Timeline</h2>
+<div class="timeline">
+    {% for post in posts %}
+    <div class="card {% if not post.images %}text-only-card{% endif %}">
+        {{ gallery(post.images) }}
+        {% if post.type %}<div class="card-type">{{ post.type }}</div>{% endif %}
+        <div class="card-title"><b>{{ post.title }}</b></div>
+        <div class="card-meta">by: {{ post.author or 'Unknown' }} · {{ post.created_at.strftime('%b %d, %Y') }}</div>
+        <p class="card-excerpt">{{ post.content[:180] }}{% if post.content|length > 180 %}...{% endif %}</p>
+        <a href="{{ url_for('view_post', post_id=post.id) }}" class="read-more">Read More→</a>
+        <div class="status-row">{{ status_badge(post.status) }}</div>
+    </div>
+    {% else %}
+    <p class="empty">Nothing on the timeline yet.</p>
+    {% endfor %}
+</div>
+{% endblock %}

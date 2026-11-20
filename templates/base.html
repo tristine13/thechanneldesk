@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}The Channel Desk{% endblock %}</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body class="{% block bodyclass %}{% endblock %}">
+    {% block shell %}
+    {% if session.user_id %}
+    <script>
+        (function () {
+            var b = document.body, k = 'cd_sidebar';
+            try {
+                var s = localStorage.getItem(k);
+                if (s === 'hidden' || (s === null && window.innerWidth < 900)) b.classList.add('sidebar-hidden');
+            } catch (e) { }
+            window.toggleSidebar = function () {
+                b.classList.toggle('sidebar-hidden');
+                try { localStorage.setItem(k, b.classList.contains('sidebar-hidden') ? 'hidden' : 'shown'); } catch (e) { }
+            };
+        })();
+    </script>
+    <button type="button" class="sidebar-toggle" onclick="toggleSidebar()" title="Show / hide menu"
+        aria-label="Show or hide menu">☰</button>
+    {% endif %}
+
+    <div class="{{ 'app-shell' if session.user_id else '' }}">
+        {% if session.user_id %}
+        <aside class="sidebar">{% include '_nav.html' %}</aside>
+        {% endif %}
+
+        <main class="{{ 'main' if session.user_id else '' }}">
+            <div class="dashboard-wrap">
+                {% if session.user_id %}
+                <div class="header">
+                    <div class="header-tagline">By Truth,<br>We Shape Lives</div>
+                    <a class="brand" href="{{ url_for('dashboard') }}">The Channel Desk</a>
+                </div>
+                {% endif %}
+
+                {% with msgs = get_flashed_messages(with_categories=true) %}
+                {% for cat, msg in msgs %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
+                {% endwith %}
+
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+    {% endblock %}
+</body>
+
+</html>

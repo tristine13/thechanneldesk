@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf with context %}
+{% block title %}Announcements{% endblock %}
+{% block content %}
+{% if session.role in ANNOUNCE %}
+<h2 class="timeline-title">New Announcement</h2>
+<form method="POST" class="panel center-panel">
+    {{ csrf() }}
+    <label>Title</label>
+    <input type="text" name="title" required>
+    <label>Message</label>
+    <textarea name="body" rows="5" required></textarea>
+    <p class="muted">This is posted here and emailed to everyone.</p>
+    <div class="form-actions"><button class="btn btn-red">Post &amp; Email</button></div>
+</form>
+{% endif %}
+
+<h2 class="timeline-title">Announcements</h2>
+<div class="list">
+    {% for a in rows %}
+    <div class="row" style="display:block">
+        <b>{{ a.title }}</b>
+        <div class="muted">{{ a.author or 'Unknown' }} · {{ a.created_at.strftime('%b %d, %Y %I:%M %p') }}</div>
+        <div class="post-body" style="margin-top:10px">{{ a.body }}</div>
+    </div>
+    {% else %}<p class="empty">No announcements yet.</p>{% endfor %}
+</div>
+{% endblock %}
