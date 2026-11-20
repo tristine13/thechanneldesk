@@ -28,7 +28,9 @@
         })();
     </script>
     <button type="button" class="sidebar-toggle" onclick="toggleSidebar()" title="Show / hide menu"
-        aria-label="Show or hide menu">☰</button>
+        aria-label="Show or hide menu">
+        <img src="{{ url_for('static', filename='images/channellogo.png') }}" alt="Menu">
+    </button>
     {% endif %}
 
     <div class="{{ 'app-shell' if session.user_id else '' }}">

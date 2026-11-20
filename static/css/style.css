@@ -2397,3 +2397,24 @@ body.apv-page {
         flex-wrap: wrap;
     }
 }
+
+/* ---- logo as the sidebar button ---- */
+.sidebar-toggle {
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0;
+}
+
+.sidebar-toggle img {
+    width: 26px;
+    height: 26px;
+    object-fit: contain;
+    transition: filter .2s;
+}
+
+.sidebar-toggle:hover img {
+    filter: invert(1);
+    /* bird turns white on the maroon hover background */
+}
