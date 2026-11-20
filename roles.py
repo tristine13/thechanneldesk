@@ -56,7 +56,7 @@ ACTION_LABELS = {"approve": "Approve", "revise": "Revise", "reject": "Reject"}
 # Who may do what
 REVIEWERS = {ADMIN, NEWS_EDITOR, EIC, ADVISER}   # may open the Approvals dashboard
 SEE_ALL_POSTS = REVIEWERS                        # may open any *submitted* output
-ASSIGN_TASKS = {ADMIN, EIC, ADVISER}
+ASSIGN_TASKS = {EIC, ADVISER}                    # Admin is view-only for tasks
 ANNOUNCE = {ADMIN, ADVISER, EIC}
 MANAGE_USERS = {ADMIN}
 
@@ -83,13 +83,14 @@ def visible_stages(role):
 def can_act(role, post, user_id):
     """May this user approve / revise / reject this post right now?
 
-    The reviewer for the post's current stage can act; the Admin (who oversees
-    the whole system) can act at any stage. Nobody reviews their own work.
+    Only the reviewer for the post's current stage can act. The Admin is view-only:
+    they can see every stage but never approve, revise or reject. Nobody reviews
+    their own work.
     """
     if post["user_id"] == user_id:
         return False
     stage_role = STAGE_REVIEWER.get(post["status"])
-    return bool(stage_role) and (role == ADMIN or role == stage_role)
+    return bool(stage_role) and role == stage_role
 
 
 def login_required(view):

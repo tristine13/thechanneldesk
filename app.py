@@ -112,7 +112,9 @@ def approval_count():
     if "user_id" not in session or session.get("role") not in REVIEWERS:
         return 0
     role = session["role"]
-    stages = [s for s, r in STAGE_REVIEWER.items() if role == ADMIN or r == role]
+    stages = [s for s, r in STAGE_REVIEWER.items() if r == role]   # Admin is view-only: 0
+    if not stages:
+        return 0
     marks = ",".join(["%s"] * len(stages))
     row = query(f"SELECT COUNT(*) AS n FROM posts WHERE status IN ({marks}) AND user_id <> %s",
                 (*stages, session["user_id"]), one=True)
@@ -480,9 +482,19 @@ def review_queue():
                     ("approved", "Approved", latest("approved"))]
 
     waiting = sum(1 for p in posts if p["can_act"])
+
+    # data for the tabbed view: what needs this user's sign-off, everything in review,
+    # and (Admin only) the outcome history
+    pending_rows = [p for _, _, rows in sections for p in rows]
+    action_rows = [p for p in pending_rows if p["can_act"]]
+    outcome_rows = {k: rows for k, _, rows in outcomes}
+    # stage card to highlight: the user's own stage (the Admin is view-only: none)
+    highlight = [k for k, _ in stages if STAGE_REVIEWER[k] == role]
     return render_template("approvals.html", sections=sections, outcomes=outcomes,
                            counts=counts, waiting=waiting, stages=stages,
-                           show_outcomes=is_admin)
+                           show_outcomes=is_admin, pending_rows=pending_rows,
+                           action_rows=action_rows, outcome_rows=outcome_rows,
+                           highlight=highlight)
 
 @app.route("/post/<int:post_id>")
 @login_required
@@ -504,6 +516,9 @@ def review_post(post_id):
     post = query(POST_SELECT + "WHERE p.id = %s", (post_id,), one=True)
     if not post:
         abort(404)
+    if session["role"] == ADMIN:
+        flash("The Admin has view-only access to approvals.", "error")
+        return redirect(url_for("review_queue"))
     if post["user_id"] == session["user_id"]:
         flash("You can't review your own work.", "error")
         return redirect(url_for("review_queue"))
@@ -644,8 +659,10 @@ def task_status(task_id):
         abort(404)
     is_assignee = query("SELECT id FROM task_assignments WHERE task_id=%s AND user_id=%s",
                         (task_id, uid), one=True)
-    is_creator = task["created_by"] == uid or session["role"] == ADMIN
-    # assignees move it forward; only the creator (or the admin) can mark it completed
+    is_creator = task["created_by"] == uid
+    # assignees move it forward; only the creator can mark it completed (never the Admin)
+    if session["role"] == ADMIN and status == "completed":
+        abort(403)
     if status == "completed" and not is_creator:
         abort(403)
     if not (is_assignee or is_creator):

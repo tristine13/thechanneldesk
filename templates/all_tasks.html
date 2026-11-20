@@ -3,6 +3,7 @@
 {% block title %}All Tasks{% endblock %}
 {% block content %}
 <h2 class="timeline-title">All Tasks (Admin overview)</h2>
+<p class="flow-note">View only</p>
 <div class="list">
     {% for t in all_tasks %}
     <div class="row">
@@ -11,13 +12,6 @@
         </div>
         <div class="row-right">
             <div class="status {{ t.status }}">{{ TASK_LABELS[t.status] }}</div>
-            {% if t.status != 'completed' %}
-            <form method="POST" action="{{ url_for('task_status', task_id=t.id) }}">
-                {{ csrf() }}<input type="hidden" name="status" value="completed">
-                <input type="hidden" name="next" value="{{ url_for('admin_tasks') }}">
-                <button class="btn btn-approve">Mark completed</button>
-            </form>
-            {% endif %}
         </div>
     </div>
     {% else %}<p class="empty">No tasks in the system yet.</p>{% endfor %}
