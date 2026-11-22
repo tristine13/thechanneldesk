@@ -1,4 +1,4 @@
-"""The Channel Desk (Flask + MySQL/MariaDB).
+"""The Channel Desk (Flask + PostgreSQL on Supabase).
 
 Roles: Admin, Adviser, Editor-in-Chief, News Editor, Staff.
 Run:   flask --app app run --debug
@@ -9,6 +9,7 @@ import secrets
 import uuid
 from html import escape
 
+import requests
 from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
 from flask import (Flask, abort, flash, redirect, render_template, request,
@@ -30,11 +31,21 @@ app.secret_key = os.getenv("SECRET_KEY", "dev-only-change-me")
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 app.config["UPLOAD_FOLDER"] = os.path.join(os.path.dirname(__file__), "uploads")
 app.teardown_appcontext(close_db)
-os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+try:
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+except OSError:      # read-only filesystem (Vercel): pictures go to Supabase Storage instead
+    pass
+
+# Pictures are stored in a public Supabase Storage bucket when SUPABASE_URL + a server key are set.
+SUPABASE_URL = (os.getenv("SUPABASE_URL") or "").rstrip("/")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_SECRET_KEY") or ""
+STORAGE_BUCKET = os.getenv("STORAGE_BUCKET", "uploads")
+USE_STORAGE = bool(SUPABASE_URL and SUPABASE_KEY)
 ALLOWED_EXT = {"png", "jpg", "jpeg", "gif", "webp"}
 
 # type of work: used for tasks.type and for new posts.type
-TASK_TYPES = ["News", "Sports", "Feature", "Column"]
+# (same sections as the student news site; old "Column" posts show under Opinion there)
+TASK_TYPES = ["News", "Opinion", "Feature", "Literary", "Sci-Tech", "Sports", "Lokal"]
 POST_TYPES = TASK_TYPES
 
 oauth = OAuth(app)
@@ -130,7 +141,17 @@ def save_images(post_id, files):
             flash(f"Skipped {f.filename}: unsupported file type.", "error")
             continue
         name = f"{uuid.uuid4().hex}_{secure_filename(f.filename)}"
-        f.save(os.path.join(app.config["UPLOAD_FOLDER"], name))
+        if USE_STORAGE:
+            resp = requests.post(
+                f"{SUPABASE_URL}/storage/v1/object/{STORAGE_BUCKET}/{name}",
+                headers={"Authorization": f"Bearer {SUPABASE_KEY}", "apikey": SUPABASE_KEY,
+                         "Content-Type": f.mimetype or "application/octet-stream"},
+                data=f.read(), timeout=30)
+            if resp.status_code >= 300:
+                flash(f"Could not upload {f.filename}.", "error")
+                continue
+        else:
+            f.save(os.path.join(app.config["UPLOAD_FOLDER"], name))
         # the DB trigger `after_post_image_insert` keeps posts.image_count in sync
         execute("INSERT INTO post_images (post_id, image) VALUES (%s, %s)", (post_id, name))
 
@@ -302,7 +323,7 @@ def auth_callback():
 
     user = query("SELECT * FROM users WHERE email = %s", (email,), one=True)
     if not user:
-        uid = execute("INSERT INTO users (email, role, name, google_id) VALUES (%s,%s,%s,%s)",
+        uid = execute("INSERT INTO users (email, role, name, google_id) VALUES (%s,%s,%s,%s) RETURNING id",
                       (email, STAFF, reg["name"], info.get("sub")))
         user = {"id": uid, "role": STAFF}
     elif not user.get("google_id") and info.get("sub"):
@@ -324,6 +345,8 @@ def logout():
 @app.route("/uploads/<path:filename>")
 @login_required
 def uploads(filename):
+    if USE_STORAGE:
+        return redirect(f"{SUPABASE_URL}/storage/v1/object/public/{STORAGE_BUCKET}/{filename}")
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 
@@ -379,7 +402,7 @@ def create(post_id=None):
                     (title, ptype, content, status, post_id))
         else:
             post_id = execute(
-                "INSERT INTO posts (user_id, title, type, content, status) VALUES (%s,%s,%s,%s,%s)",
+                "INSERT INTO posts (user_id, title, type, content, status) VALUES (%s,%s,%s,%s,%s) RETURNING id",
                 (session["user_id"], title, ptype, content, status))
         save_images(post_id, request.files.getlist("images"))
 
@@ -601,7 +624,7 @@ def assign_task():
         if not title or not people:
             flash("Please enter a title and pick at least one assignee.", "error")
             return redirect(url_for("assign_task"))
-        tid = execute("INSERT INTO tasks (title, description, type, created_by) VALUES (%s,%s,%s,%s)",
+        tid = execute("INSERT INTO tasks (title, description, type, created_by) VALUES (%s,%s,%s,%s) RETURNING id",
                       (title, desc, ttype, uid))
         for person in people:
             execute("INSERT INTO task_assignments (task_id, user_id) VALUES (%s,%s)", (tid, person))
@@ -622,7 +645,7 @@ def admin_tasks():
     # admin oversees every task in the system
     rows = query(
         "SELECT t.*, MAX(COALESCE(cr.name, cu.name, cu.email)) AS creator, "
-        "GROUP_CONCAT(COALESCE(r.name, au.name, au.email) SEPARATOR ', ') AS assignee "
+        "STRING_AGG(COALESCE(r.name, au.name, au.email), ', ') AS assignee "
         "FROM tasks t JOIN users cu ON cu.id = t.created_by "
         "LEFT JOIN registrations cr ON cr.email = cu.email "
         "LEFT JOIN task_assignments ta ON ta.task_id = t.id "
@@ -637,7 +660,7 @@ def admin_tasks():
 def assigned_tasks():
     uid = session["user_id"]
     assigned = query(
-        "SELECT t.*, GROUP_CONCAT(COALESCE(r.name, au.name, au.email) SEPARATOR ', ') AS assignee "
+        "SELECT t.*, STRING_AGG(COALESCE(r.name, au.name, au.email), ', ') AS assignee "
         "FROM tasks t "
         "LEFT JOIN task_assignments ta ON ta.task_id = t.id "
         "LEFT JOIN users au ON au.id = ta.user_id "
@@ -798,7 +821,8 @@ def admin_create():
 
     execute("INSERT INTO registrations (name, email, position, is_verified) VALUES (%s,%s,%s,1)",
             (name, email, position))
-    uid = execute("INSERT INTO users (email, role, name) VALUES (%s,%s,%s)", (email, role, name))
+    uid = execute("INSERT INTO users (email, role, name) VALUES (%s,%s,%s) RETURNING id",
+                  (email, role, name))
     notify(uid, f"An admin created your account. You can now sign in with Google as "
                 f"{ROLE_LABELS[role]}.",
            "general", None, subject="Your Channel Desk account is ready", email=send,
@@ -820,7 +844,7 @@ def admin_verify(reg_id):
     execute("UPDATE registrations SET is_verified=1 WHERE id=%s", (reg_id,))
     user = query("SELECT id, role FROM users WHERE email=%s", (reg["email"],), one=True)
     if not user:
-        uid = execute("INSERT INTO users (email, role, name) VALUES (%s,%s,%s)",
+        uid = execute("INSERT INTO users (email, role, name) VALUES (%s,%s,%s) RETURNING id",
                       (reg["email"], role, reg["name"]))
     else:
         uid = user["id"]

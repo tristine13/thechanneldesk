@@ -61,7 +61,13 @@ CREATE TABLE IF NOT EXISTS tasks (
     FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Public student reader (also created automatically on first visit to /news)
+-- Sections used by the student news site (News, Opinion, Feature, Literary, Sci-Tech, Sports, Lokal).
+-- Run once on an existing database so the new types can be saved (safe if the columns are
+-- already VARCHAR; needed if they were ENUMs):
+--   ALTER TABLE posts MODIFY type VARCHAR(30) NOT NULL DEFAULT 'News';
+--   ALTER TABLE tasks MODIFY type VARCHAR(30) NOT NULL DEFAULT 'News';
+
+-- Public student reader (also created automatically on first visit to the news site)
 CREATE TABLE IF NOT EXISTS post_reactions (
     post_id INT NOT NULL, kind VARCHAR(20) NOT NULL, n INT NOT NULL DEFAULT 0,
     PRIMARY KEY (post_id, kind)
