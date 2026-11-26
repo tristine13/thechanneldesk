@@ -1,0 +1,8 @@
+.env
+.git
+venv/
+.venv/
+uploads/
+__pycache__/
+index.php
+schema.sql

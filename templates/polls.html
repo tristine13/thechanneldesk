@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf with context %}
+{% block title %}Polls{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/editorial-lists.css') }}">
+{% set pill = {'open': ['approved', 'Open'], 'upcoming': ['pending', 'Starts soon'], 'closed': ['draft', 'Closed']} %}
+
+{% macro item(p) %}
+{% set top = (p.results|map(attribute='n')|max) if p.results else 0 %}
+<div class="el-row">
+    <div>
+        <span class="el-name" style="cursor:default">{{ p.question }}</span>
+        <div class="el-meta">
+            <span>{{ p.creator or 'Unknown' }}</span>
+            <span>{{ p.starts }} &rarr; {{ p.ends }}</span>
+        </div>
+    </div>
+    <div class="el-side">
+        <span class="el-pill p-{{ pill[p.phase][0] }}">{{ pill[p.phase][1] }}</span>
+        {% if can_manage and p.phase != 'closed' %}
+        <form method="POST" action="{{ url_for('poll_close', poll_id=p.id) }}"
+            onsubmit="return confirm('{{ 'Cancel this poll?' if p.phase == 'upcoming' else 'Close this poll now? Voting stops and the result stays on the student site.' }}')">
+            {{ csrf() }}
+            <button class="el-act no">{{ 'Cancel poll' if p.phase == 'upcoming' else 'Close now' }}</button>
+        </form>
+        {% endif %}
+    </div>
+    {% if p.phase != 'upcoming' %}
+    <div class="pl-res">
+        {% for r in p.results %}
+        <div class="pl-opt">
+            <span>{{ r.label }}</span>
+            <span class="num"><b>{{ r.n }}</b> &middot; {{ r.pct }}%</span>
+            <span class="pl-track"><span class="pl-fill{{ ' lead' if top and r.n == top }}" style="width:{{ r.pct }}%"></span></span>
+        </div>
+        {% endfor %}
+        <div class="pl-total">{{ p.total }} vote{{ '' if p.total == 1 else 's' }}</div>
+    </div>
+    {% else %}
+    <div class="pl-chips" style="grid-column:1/-1">{% for l in p.labels %}<span>{{ l }}</span>{% endfor %}</div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+<div class="el">
+    <header class="el-hd"><span class="crumb">Polls</span></header>
+    <div class="el-wrap">
+        <div class="el-band">
+        <h1 class="el-title">Polls</h1>
+
+        </div>
+
+        {% if can_manage %}
+        <details class="pl-new">
+            <summary>New Campus Pulse poll</summary>
+            <form method="POST" action="{{ url_for('poll_create') }}">
+                {{ csrf() }}
+                <div class="el-props">
+                    <div class="k">Question</div>
+                    <div class="v"><input class="el-field" type="text" name="question" maxlength="255" placeholder="e.g. What should we cover more of this semester?" required></div>
+                    <div class="k">Options</div>
+                    <div class="v">
+                        {% for i in range(6) %}
+                        <input class="el-field" type="text" name="option" maxlength="80" placeholder="Option {{ i + 1 }}{{ '' if i < 2 else ' (optional)' }}" {{ 'required' if i < 2 }}>
+                        {% endfor %}
+                    </div>
+                    <div class="k">Opens</div>
+                    <div class="v"><input class="el-field" type="datetime-local" name="starts_at" value="{{ start_default }}" required></div>
+                    <div class="k">Closes</div>
+                    <div class="v"><input class="el-field" type="datetime-local" name="ends_at" value="{{ end_default }}" required></div>
+                </div>
+                <p class="pl-note">Everyone is notified when voting opens. The Adviser, Editor-in-Chief and Admin get the result when it closes.
+                    While a poll is open the student site shows it in Campus Pulse; afterwards it shows the final result.</p>
+                <button class="el-btn solid">Create poll</button>
+            </form>
+        </details>
+        {% endif %}
+
+        {% for key, label in [('open', 'Open now'), ('upcoming', 'Upcoming'), ('closed', 'Closed')] %}
+        {% if groups[key] %}
+        <div class="el-group"><div class="el-label">{{ label }}</div>{% for p in groups[key] %}{{ item(p) }}{% endfor %}</div>
+        {% endif %}
+        {% endfor %}
+        {% if not total %}<div class="el-empty"><p>No polls yet.</p></div>{% endif %}
+    </div>
+</div>
+{% endblock %}

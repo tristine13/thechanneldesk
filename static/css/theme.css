@@ -1,0 +1,272 @@
+/* =====================================================================
+   The Channel Desk: new look (loaded LAST, after style.css / lists.css / nav.css).
+   Step 1 of the redesign: colour tokens, fonts and the page background.
+   Every screen already reads its colours from these tokens, so changing them here re-skins the app.
+   To go back to the old maroon look, remove the theme.css <link> in templates/base.html.
+   ===================================================================== */
+
+:root {
+    /* one electric-indigo accent (the old --maroon tokens now carry it) */
+    --maroon: #4F46E5;
+    --dark: #1E1B4B;
+    --maroon-tint: #EEF0FF;
+    --accent-2: #7C3AED;
+    --grad-maroon: linear-gradient(135deg, #4F46E5, #7C3AED);
+
+    /* surfaces */
+    --bg: #FAFAFA;
+    --bg-soft: #F4F4F6;
+    --white: #FFFFFF;
+    --field: #F2F2F4;
+    --chip: #E9E9ED;
+    --chip-soft: #F0F0F3;
+    --line: #E7E7EA;
+    --line-strong: #CFCFD6;
+
+    /* text */
+    --ink: #18181B;
+    --ink-2: #3F3F46;
+    --text-soft: #52525B;
+    --muted: #71717A;
+
+    /* status colours (used only for status) */
+    --success: #16A34A;
+    --danger: #E11D48;
+    --danger-dark: #BE123C;
+    --warn-bg: #FEF3C7;
+    --warn-text: #92400E;
+    --info-bg: #E0E7FF;
+    --info-text: #3730A3;
+    --ok-bg: #DCFCE7;
+    --bad-bg: #FFE4E6;
+    --review-bg: #EDE9FE;
+    --review-text: #5B21B6;
+
+    /* type + shape */
+    --font-head: 'Newsreader', Georgia, serif;
+    --font-body: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+    --radius-card: 16px;
+    --radius-row: 12px;
+    --radius-field: 10px;
+    --shadow-1: 0 1px 2px rgba(24, 24, 27, .05);
+    --shadow-2: 0 10px 28px rgba(79, 70, 229, .12);
+}
+
+/* ---------- the background: soft indigo glows + a whisper of paper grain ---------- */
+body,
+body.admin-page {
+    background-color: var(--bg);
+    background-image:
+        radial-gradient(900px 560px at 100% -10%, rgba(99, 102, 241, .17), transparent 62%),
+        radial-gradient(760px 520px at -6% 108%, rgba(167, 139, 250, .15), transparent 62%),
+        radial-gradient(520px 380px at 55% 115%, rgba(251, 113, 133, .07), transparent 60%),
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .04 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    background-attachment: fixed;
+    color: var(--ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* the work area: a faint dot grid, and a colourful gradient band behind the page heading */
+.main {
+    position: relative;
+    background-image: radial-gradient(rgba(24, 24, 27, .07) 1px, transparent 1.2px);
+    background-size: 24px 24px;
+}
+
+.main::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 240px;
+    pointer-events: none;
+    background:
+        radial-gradient(520px 210px at 18% 0, rgba(79, 70, 229, .16), transparent 70%),
+        radial-gradient(460px 200px at 60% 0, rgba(124, 58, 237, .12), transparent 70%),
+        radial-gradient(420px 190px at 96% 0, rgba(251, 113, 133, .12), transparent 70%);
+}
+
+.dashboard-wrap {
+    position: relative;
+    z-index: 1;
+}
+
+/* ---------- type ---------- */
+h1,
+h2,
+h3 {
+    font-family: var(--font-head);
+    font-weight: 600;
+    letter-spacing: -.01em;
+    color: var(--ink);
+}
+
+.timeline-title {
+    font-size: 32px;
+}
+
+.brand,
+.side-logo span {
+    font-family: var(--font-head);
+}
+
+/* ---------- surfaces: crisp borders and gentle depth ---------- */
+.card,
+.panel,
+.row,
+.stat,
+.nt-card {
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-1);
+}
+
+.card {
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-2);
+    border-color: #C7C9F7;
+}
+
+.row {
+    transition: box-shadow .18s ease, border-color .18s ease;
+}
+
+.row:hover {
+    border-color: #C7C9F7;
+    box-shadow: 0 6px 18px rgba(79, 70, 229, .08);
+}
+
+.card-type {
+    color: var(--maroon);
+}
+
+/* ---------- controls ---------- */
+input,
+select,
+textarea {
+    border: 1px solid var(--line);
+    background: var(--field);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    outline: 2px solid var(--maroon);
+    outline-offset: 0;
+    background: #fff;
+}
+
+:focus-visible {
+    outline: 2px solid var(--maroon);
+    outline-offset: 2px;
+}
+
+.btn {
+    font-weight: 600;
+    transition: transform .12s ease, box-shadow .15s ease, opacity .15s ease;
+}
+
+.btn:hover {
+    opacity: 1;
+    transform: translateY(-1px);
+}
+
+.btn-red {
+    background: var(--grad-maroon);
+    box-shadow: 0 4px 14px rgba(79, 70, 229, .28);
+}
+
+.btn-red:hover {
+    box-shadow: 0 6px 18px rgba(79, 70, 229, .38);
+}
+
+.btn-outline {
+    border-color: var(--line-strong);
+}
+
+.btn-outline:hover {
+    border-color: var(--maroon);
+    color: var(--maroon);
+}
+
+/* ---------- sidebar: deep charcoal-indigo instead of a maroon wall ---------- */
+.sidebar {
+    background: linear-gradient(185deg, #1E1B4B 0%, #18181B 70%);
+}
+
+.side-profile {
+    background: #18181B;
+    border-top-color: rgba(255, 255, 255, .12);
+}
+
+.side-nav a.active {
+    background: #fff;
+    color: var(--maroon);
+    font-weight: 600;
+}
+
+/* ---------- the writing page: editorial serif, like paper ---------- */
+.ed-area,
+.ed-mirror {
+    font-family: 'Newsreader', Georgia, serif !important;
+    font-size: 18px !important;
+    line-height: 1.7;
+}
+
+.wd-stage {
+    background-color: #EDEDF1;
+    background-image: radial-gradient(rgba(24, 24, 27, .10) 1px, transparent 1.2px);
+    background-size: 24px 24px;
+}
+
+.wd-sheet {
+    border-radius: 4px;
+}
+
+.post-body {
+    font-family: 'Newsreader', Georgia, serif;
+    font-size: 18px;
+}
+
+/* ---------- admin pages: same accent ---------- */
+.adm {
+    --crimson: #4F46E5;
+    --crimson-hover: #4338CA;
+    --a-hover: #F4F4F6;
+    --a-line: #E7E7EA;
+}
+
+.adm-drawer .adm-btn-primary {
+    background: #4F46E5;
+}
+
+.adm-drawer label.adm-role.on {
+    border-color: #4F46E5;
+    box-shadow: inset 0 0 0 1px #4F46E5;
+}
+
+.adm-drawer .adm-switch:checked {
+    background: #4F46E5;
+}
+
+.adm-drawer .adm-role input {
+    accent-color: #4F46E5;
+}
+
+.adm-drawer .adm-dd.open .adm-dd-btn {
+    border-color: #4F46E5;
+}
+
+.adm-kv.k-tasks {
+    color: #4F46E5;
+}
+
+.adm-card,
+.adm-alert,
+.adm-empty,
+.adm-kpi {
+    box-shadow: var(--shadow-1);
+}
