@@ -502,8 +502,8 @@ input[type=number] {
         transition: opacity .18s ease, visibility .18s;
     }
 
-    body.sidebar-collapsed .side-dropdown:hover .side-sub-wrap,
-    body.sidebar-collapsed .side-dropdown:focus-within .side-sub-wrap {
+    /* click the Tasks icon to open the card, click it again (or anywhere else) to close it */
+    body.sidebar-collapsed .side-dropdown.open .side-sub-wrap {
         opacity: 1;
         visibility: visible;
     }

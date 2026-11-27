@@ -2,33 +2,91 @@
 {% from "_macros.html" import csrf with context %}
 {% block title %}My Tasks{% endblock %}
 {% block content %}
-<h2 class="timeline-title">My Tasks</h2>
-<div class="list">
-    {% for t in mine %}
-    <div class="row">
-        <div>
-            <b>{{ t.title }}</b>
-            <div class="muted">{{ t.type }} · from {{ t.creator or 'Unknown' }} · {{ t.created_at.strftime('%b %d, %Y')
-                }}</div>
-            {% if t.description %}<div>{{ t.description }}</div>{% endif %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/editorial-lists.css') }}">
+{% set TAGS = CAT_COLORS %}
+{% set today_rows = mine|selectattr('is_today')|list %}
+{% set earlier_rows = mine|rejectattr('is_today')|list %}
+{% set open_n = mine|rejectattr('status', 'equalto', 'completed')|list|length %}
+
+{% macro item(t) %}
+{% set c = TAGS.get(t.type, ['#F1F1EF', '#5A5955']) %}
+<div class="el-row" data-group="{{ t.status }}" data-q="{{ (t.title ~ ' ' ~ (t.type or '') ~ ' ' ~ (t.creator or ''))|lower }}">
+    <div>
+        <span class="el-name" style="cursor:default">{{ t.title }}</span>
+        <div class="el-meta">
+            {% if t.type %}<span class="el-tag" style="background:{{ c[0] }};color:{{ c[1] }}">{{ t.type }}</span>{% endif %}
+            <span>Assigned by {{ t.creator or 'Unknown' }}</span>
+            <span title="{{ t.created_at.strftime('%b %d, %Y %I:%M %p') }}">{{ t.created_at.strftime('%b %d, %Y') }}</span>
         </div>
-        {% if t.status == 'completed' %}
-        <div class="status completed">Completed</div>
-        {% else %}
-        <div class="row-right">
-            <a class="btn btn-outline" href="{{ url_for('create', task_id=t.id) }}">Edit</a>
-            <form method="POST" action="{{ url_for('task_status', task_id=t.id) }}" class="row-right">
-                {{ csrf() }}
-                <input type="hidden" name="next" value="{{ url_for('my_tasks') }}">
-                <select name="status" onchange="this.form.submit()">
-                    <option value="pending" {{ 'selected' if t.status=='pending' }}>To do</option>
-                    <option value="in_progress" {{ 'selected' if t.status=='in_progress' }}>In progress</option>
-                    <option value="submitted" {{ 'selected' if t.status=='submitted' }}>Submitted</option>
-                </select>
-            </form>
+        {% if t.description %}<div class="el-ex">{{ t.description }}</div>{% endif %}
+    </div>
+    <div class="el-side">
+        <span class="el-pill p-{{ t.status }}">{{ TASK_LABELS.get(t.status, t.status) }}</span>
+        {% if t.status != 'completed' %}
+        <a class="el-act go" href="{{ url_for('create', task_id=t.id) }}">Start writing</a>
+        <form method="POST" action="{{ url_for('task_status', task_id=t.id) }}">
+            {{ csrf() }}
+            <input type="hidden" name="next" value="{{ url_for('my_tasks') }}">
+            <select class="el-sel" name="status" onchange="this.form.submit()" aria-label="Task status">
+                <option value="pending" {{ 'selected' if t.status=='pending' }}>To do</option>
+                <option value="in_progress" {{ 'selected' if t.status=='in_progress' }}>In progress</option>
+                <option value="submitted" {{ 'selected' if t.status=='submitted' }}>Submitted</option>
+            </select>
+        </form>
+        {% endif %}
+        <span class="el-time" title="{{ t.created_at.strftime('%b %d, %Y %I:%M %p') }}">{{ t.created_at|ago }}</span>
+    </div>
+</div>
+{% endmacro %}
+
+<div class="el">
+    <div class="el-wrap">
+        <div class="el-band">
+        <h1 class="el-title">My Tasks</h1>
+
+        {% if mine %}
+        <div class="el-bar">
+            <div class="el-tabs" role="tablist">
+                <button type="button" class="el-tab active" data-tab="all">All<span class="n">{{ mine|length }}</span></button>
+                <button type="button" class="el-tab" data-tab="pending">To do<span class="n">{{ mine|selectattr('status', 'equalto', 'pending')|list|length }}</span></button>
+                <button type="button" class="el-tab" data-tab="in_progress">In progress<span class="n">{{ mine|selectattr('status', 'equalto', 'in_progress')|list|length }}</span></button>
+                <button type="button" class="el-tab" data-tab="submitted">Submitted<span class="n">{{ mine|selectattr('status', 'equalto', 'submitted')|list|length }}</span></button>
+                <button type="button" class="el-tab" data-tab="completed">Completed<span class="n">{{ mine|selectattr('status', 'equalto', 'completed')|list|length }}</span></button>
+            </div>
+            <input class="el-search" type="search" id="el-q" placeholder="Search" aria-label="Search">
         </div>
         {% endif %}
+
+        </div>
+
+        {% if today_rows %}<div class="el-group"><div class="el-label">Today</div>{% for t in today_rows %}{{ item(t) }}{% endfor %}</div>{% endif %}
+        {% if earlier_rows %}<div class="el-group"><div class="el-label">Earlier</div>{% for t in earlier_rows %}{{ item(t) }}{% endfor %}</div>{% endif %}
+
+        {% if not mine %}<div class="el-empty"><p>No tasks assigned to you.</p></div>{% endif %}
+        <div class="el-empty" id="el-none" hidden><p>Nothing matches.</p></div>
     </div>
-    {% else %}<p class="empty">No tasks assigned to you.</p>{% endfor %}
 </div>
+
+<script>
+(function () {
+    var tabs = document.querySelectorAll('[data-tab]'), q = document.getElementById('el-q'), none = document.getElementById('el-none');
+    var kind = 'all';
+    function apply() {
+        var term = q ? q.value.trim().toLowerCase() : '', shown = 0;
+        document.querySelectorAll('.el-row').forEach(function (el) {
+            var ok = (kind === 'all' || el.dataset.group === kind) && (!term || el.dataset.q.indexOf(term) >= 0);
+            el.hidden = !ok; if (ok) shown++;
+        });
+        document.querySelectorAll('.el-group').forEach(function (g) { g.hidden = !g.querySelector('.el-row:not([hidden])'); });
+        if (none) none.hidden = shown > 0 || !document.querySelector('.el-row');
+    }
+    tabs.forEach(function (t) {
+        t.addEventListener('click', function () {
+            tabs.forEach(function (o) { o.classList.toggle('active', o === t); });
+            kind = t.dataset.tab; apply();
+        });
+    });
+    if (q) q.addEventListener('input', apply);
+})();
+</script>
 {% endblock %}

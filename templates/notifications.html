@@ -1,20 +1,87 @@
 {% extends "base.html" %}
+{% from "_macros.html" import csrf with context %}
 {% block title %}Notifications{% endblock %}
 {% block content %}
-<h2 class="timeline-title">Notifications</h2>
-<div class="list">
-    {% for n in rows %}
-    {% if n.reference_type == 'post' and n.reference_id %}{% set href = url_for('view_post', post_id=n.reference_id) %}
-    {% elif n.reference_type == 'task' %}{% set href = url_for('my_tasks') %}
-    {% elif n.type == 'announcement' %}{% set href = url_for('announcements') %}
-    {% elif n.type == 'registration' %}{% set href = url_for('admin') %}
-    {% else %}{% set href = None %}{% endif %}
-    <div class="row {{ '' if n.is_read else 'unread' }}">
-        <div>
-            {% if href %}<a href="{{ href }}">{{ n.message }}</a>{% else %}{{ n.message }}{% endif %}
-            <div class="muted">{{ n.created_at.strftime('%b %d, %Y %I:%M %p') }}</div>
-        </div>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/editorial-lists.css') }}">
+
+{% macro icon(kind) %}
+<span class="el-ico k-{{ kind }}" aria-hidden="true">
+    {% if kind == 'task' %}<svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h11"/></svg>
+    {% elif kind == 'submission' %}<svg viewBox="0 0 24 24"><path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></svg>
+    {% elif kind == 'announcement' %}<svg viewBox="0 0 24 24"><path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg>
+    {% elif kind == 'registration' or kind == 'role' %}<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1-4 4-6 8-6s7 2 8 6"/></svg>
+    {% else %}<svg viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15z"/><path d="M10 21h4"/></svg>{% endif %}
+</span>
+{% endmacro %}
+
+{% macro item(n) %}
+<div class="el-row has-ico{{ '' if n.is_read else ' unread' }}" data-unread="{{ 0 if n.is_read else 1 }}" data-announce="{{ 1 if n.type == 'announcement' else 0 }}">
+    {{ icon(n.type) }}
+    <div>
+        <div class="el-name" style="font-size:16px">{{ n.title or 'Notification' }}{% if not n.is_read %}<i class="el-dot" title="Unread"></i>{% endif %}</div>
+        <div class="el-ex" style="-webkit-line-clamp:3">{{ n.message }}</div>
     </div>
-    {% else %}<p class="empty">You're all caught up.</p>{% endfor %}
+    <div class="el-side">
+        {% if n.href %}<a class="el-act" href="{{ url_for('notification_open', notif_id=n.id) }}">{{ n.action }}</a>{% endif %}
+        <span class="el-time" title="{{ n.created_at.strftime('%b %d, %Y %I:%M %p') }}">{{ n.created_at|ago }}</span>
+    </div>
 </div>
+{% endmacro %}
+
+{% set today_rows = rows|selectattr('today')|list %}
+{% set earlier_rows = rows|rejectattr('today')|list %}
+{% set unread_n = rows|rejectattr('is_read')|list|length %}
+
+<div class="el">
+    <div class="el-wrap">
+        <div class="el-band">
+        <div class="el-titlebar">
+            <h1 class="el-title">Notifications</h1>
+            <div class="el-top-actions">
+                {% if session.role in ANNOUNCE %}<a class="el-btn ghost" href="{{ url_for('announcements') }}">+ Post announcement</a>{% endif %}
+                <form method="POST" action="{{ url_for('notifications_read_all') }}">
+                    {{ csrf() }}
+                    <button class="el-btn ghost" {{ '' if unread else 'disabled' }}>Mark all as read</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="el-bar">
+            <div class="el-tabs" role="tablist">
+                <button type="button" class="el-tab active" data-tab="all">All<span class="n">{{ rows|length }}</span></button>
+                <button type="button" class="el-tab" data-tab="unread">Unread<span class="n">{{ unread_n }}</span></button>
+                <button type="button" class="el-tab" data-tab="announcements">Announcements</button>
+            </div>
+        </div>
+
+        </div>
+
+        {% if today_rows %}<div class="el-group"><div class="el-label">Today</div>{% for n in today_rows %}{{ item(n) }}{% endfor %}</div>{% endif %}
+        {% if earlier_rows %}<div class="el-group"><div class="el-label">Earlier</div>{% for n in earlier_rows %}{{ item(n) }}{% endfor %}</div>{% endif %}
+
+        {% if not rows %}<div class="el-empty"><p>No notifications yet.</p></div>{% endif %}
+        <div class="el-empty" id="el-none" hidden><p>Nothing here.</p></div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var tabs = document.querySelectorAll('[data-tab]'), none = document.getElementById('el-none');
+    function apply(kind) {
+        var shown = 0;
+        document.querySelectorAll('.el-row').forEach(function (el) {
+            var ok = kind === 'all' || (kind === 'unread' && el.dataset.unread === '1') || (kind === 'announcements' && el.dataset.announce === '1');
+            el.hidden = !ok; if (ok) shown++;
+        });
+        document.querySelectorAll('.el-group').forEach(function (g) { g.hidden = !g.querySelector('.el-row:not([hidden])'); });
+        if (none) none.hidden = shown > 0 || !document.querySelector('.el-row');
+    }
+    tabs.forEach(function (t) {
+        t.addEventListener('click', function () {
+            tabs.forEach(function (o) { o.classList.toggle('active', o === t); });
+            apply(t.dataset.tab);
+        });
+    });
+})();
+</script>
 {% endblock %}

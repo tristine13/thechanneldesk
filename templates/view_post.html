@@ -2,14 +2,25 @@
 {% from "_macros.html" import status_badge, csrf, back_link with context %}
 {% block title %}{{ post.title }}{% endblock %}
 {% block content %}
-{{ back_link(url_for('review_queue') if session.role in REVIEWERS else url_for('dashboard')) }}
+{{ back_link(url_for('dashboard')) }}
 <article class="panel post-panel">
     <div class="status-row">{{ status_badge(post.status) }}</div>
     <h1 class="post-title">{{ post.title }}</h1>
-    <div class="muted">by {{ post.author or 'Unknown' }} · {{ post.type }} · {{ post.created_at.strftime('%b %d, %Y') }}
+    <div class="muted">by {{ post.author or 'Unknown' }}{% if post.type %} · {{ post.type }}{% endif %} · {% if post.status == 'approved' and post.approved_at %}Approved {{ post.approved_at.strftime('%b %d, %Y, %I:%M %p').replace(' 0', ' ') }}{% else %}{{ post.created_at.strftime('%b %d, %Y') }}{% endif %}
     </div>
-    {% for img in post.images %}<img class="post-img" src="{{ url_for('uploads', filename=img) }}" alt="">{% endfor %}
-    <div class="post-body">{{ post.content }}</div>
+    {% if post.deck %}<p class="post-deck">{{ post.deck }}</p>{% endif %}
+    {% for img in post.images %}<figure style="margin:0 0 16px"><img class="post-img" src="{{ url_for('uploads', filename=img) }}" alt="">{% if loop.first and post.image_caption %}<figcaption style="margin-top:6px;font-size:13px;font-style:italic;color:#787774;text-align:center">{{ post.image_caption }}</figcaption>{% endif %}</figure>{% endfor %}
+    <style>
+        .post-deck { margin: 8px 0 14px; font-size: 18px; line-height: 1.5; color: #57534E; }
+        .post-body.rt { white-space: normal; font-family: 'Newsreader', 'Playfair Display', Georgia, serif; font-size: 17px; line-height: 1.75; }
+        .post-body.rt p { margin: 0 0 14px; min-height: 1.2em; line-height: inherit; }
+        .post-body.rt h2 { margin: 28px 0 8px; font-size: 26px; line-height: 1.25; }
+        .post-body.rt h3 { margin: 22px 0 6px; font-size: 20px; line-height: 1.3; }
+        .post-body.rt blockquote { margin: 22px 0; padding: 2px 0 2px 18px; border-left: 3px solid #6B0F1A; font-size: 22px; line-height: 1.45; font-style: italic; }
+        .post-body.rt ul { margin: 0 0 14px 22px; padding: 0; }
+        .post-body.rt li { margin: 3px 0; }
+    </style>
+    <div class="post-body{{ ' rt' if post.content[:9] == '<!--rt-->' else '' }}">{{ post.content|rich }}</div>
 
     {% if post.feedback and post.status in ('revise', 'rejected') %}
     <div class="flash info"><b>Feedback:</b> {{ post.feedback }}</div>
@@ -18,6 +29,13 @@
     {% if can_edit %}
     <div class="form-actions"><a class="btn btn-red" href="{{ url_for('create', post_id=post.id) }}">Edit &amp;
             Resubmit</a></div>
+    {% endif %}
+
+    {% if can_archive and post.status == 'approved' %}
+    <form method="POST" action="{{ url_for('unarchive_work' if post.archived_at else 'archive_work', post_id=post.id) }}" class="form-actions">
+        {{ csrf() }}
+        <button class="btn btn-outline">{{ 'Restore to Timeline' if post.archived_at else 'Archive work' }}</button>
+    </form>
     {% endif %}
 
     {% if can_review %}

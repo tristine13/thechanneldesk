@@ -6,9 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}The Channel Desk{% endblock %}</title>
     <link
-        href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@300;400;500;600&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&family=Inter:wght@300;400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/lists.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/nav.css') }}">
+    <script defer src="{{ url_for('static', filename='js/tabs-dropdown.js') }}"></script>
 </head>
 
 <body class="{% block bodyclass %}{% endblock %}">
@@ -16,21 +19,26 @@
     {% if session.user_id %}
     <script>
         (function () {
-            var b = document.body, k = 'cd_sidebar';
-            try {
-                var s = localStorage.getItem(k);
-                if (s === 'hidden' || (s === null && window.innerWidth < 900)) b.classList.add('sidebar-hidden');
-            } catch (e) { }
+            var b = document.body, k = 'cd_sidebar_rail';
+            var wide = function () { return window.innerWidth > 900; };
+            try { if (localStorage.getItem(k) === '1' && wide()) b.classList.add('sidebar-collapsed'); } catch (e) { }
+            // wide windows: collapse to an icon rail; narrow windows: slide the panel over the page
             window.toggleSidebar = function () {
-                b.classList.toggle('sidebar-hidden');
-                try { localStorage.setItem(k, b.classList.contains('sidebar-hidden') ? 'hidden' : 'shown'); } catch (e) { }
+                if (wide()) {
+                    b.classList.toggle('sidebar-collapsed');
+                    try { localStorage.setItem(k, b.classList.contains('sidebar-collapsed') ? '1' : '0'); } catch (e) { }
+                } else {
+                    b.classList.toggle('sidebar-open');
+                }
             };
+            window.addEventListener('resize', function () { if (wide()) b.classList.remove('sidebar-open'); });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') b.classList.remove('sidebar-open'); });
         })();
     </script>
-    <button type="button" class="sidebar-toggle" onclick="toggleSidebar()" title="Show / hide menu"
-        aria-label="Show or hide menu">
+    <button type="button" class="sidebar-fab" onclick="toggleSidebar()" title="Show menu" aria-label="Show menu">
         <img src="{{ url_for('static', filename='images/channellogo.png') }}" alt="Menu">
     </button>
+    <div class="sidebar-scrim" onclick="document.body.classList.remove('sidebar-open')"></div>
     {% endif %}
 
     <div class="{{ 'app-shell' if session.user_id else '' }}">

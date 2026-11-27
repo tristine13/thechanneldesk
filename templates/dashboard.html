@@ -1,21 +1,287 @@
 {% extends "base.html" %}
-{% from "_macros.html" import status_badge, gallery %}
-{% block title %}Dashboard{% endblock %}
+{% block title %}Timeline{% endblock %}
 {% block content %}
-<h2 class="timeline-title">Timeline</h2>
-<div class="timeline">
-    {% for post in posts %}
-    <div class="card {% if not post.images %}text-only-card{% endif %}">
-        {{ gallery(post.images) }}
-        {% if post.type %}<div class="card-type">{{ post.type }}</div>{% endif %}
-        <div class="card-title"><b>{{ post.title }}</b></div>
-        <div class="card-meta">by: {{ post.author or 'Unknown' }} · {{ post.created_at.strftime('%b %d, %Y') }}</div>
-        <p class="card-excerpt">{{ post.content[:180] }}{% if post.content|length > 180 %}...{% endif %}</p>
-        <a href="{{ url_for('view_post', post_id=post.id) }}" class="read-more">Read More→</a>
-        <div class="status-row">{{ status_badge(post.status) }}</div>
+{# category colours: pastel fill + high-contrast text #}
+{% set CAT = {
+  'News':      ('#FFE2DD', '#992B1B'),
+  'Editorial': ('#EAE4F2', '#5B2C83'),
+  'Opinion':   ('#FDECC8', '#9A6700'),
+  'Feature':   ('#FADEC9', '#8F471A'),
+  'Literary':  ('#F5E0E9', '#852952'),
+  'Sci-Tech':  ('#D3E5EF', '#1D5B79'),
+  'Sports':    ('#DBEDDB', '#1E6034'),
+  'Lokal':     ('#E3E2E0', '#37352F'),
+  'Other':     ('#EFEFED', '#37352F') } %}
+{% set authors = posts|map(attribute='author')|select|unique|sort|list %}
+<style>
+    /* ---------- Timeline: database-style gallery (this page only) ---------- */
+    body, .main { background: #FBFBFA; }
+    .dashboard-wrap { max-width: 1200px; }
+    .tl { --tl-maroon: #6B0F1A; --tl-ink: #1F1F1F; --tl-muted: #6B7280; --tl-line: #E5E7EB; font-family: var(--font-body); color: var(--tl-ink); }
+    /* warm ivory header band behind the title, view switcher and category tabs; ruled off from the page below */
+    .main { overflow-x: clip; }
+    .tl-band { position: relative; z-index: 20; isolation: isolate; margin: 0 0 24px; padding: 34px 0 0; }
+    .tl-band::before { content: ""; position: absolute; z-index: -1; top: 0; bottom: 0; left: -100vmax; right: -100vmax; background: #F5F3EE; border-bottom: 1px solid #E2E0D8; }
+    .tl-band .tl-bar, .tl-band .tl-cats { border-bottom: 0; margin-bottom: 0; }
+    .tl-band .tl-bar { padding-bottom: 6px; }
+    .tl-band .tl-cats { padding: 4px 0 16px; }
+    .tl-band .tl-tab[aria-selected="true"] { border-bottom-color: var(--tl-maroon); }
+    .tl::after { content: "THE CHANNEL DESK \00B7  EDITORIAL MANAGEMENT SYSTEM \00B7  FELLOWSHIP BAPTIST COLLEGE"; display: block; margin-top: 48px; padding: 24px 0 8px; text-align: center; font: 400 11px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .1em; color: #9B9A97; }
+    .tl-head { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; }
+    .tl-head svg { width: 30px; height: 30px; flex: 0 0 auto; fill: none; stroke: var(--tl-ink); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+    .tl-head h1 { font-family: var(--font-head); font-size: 32px; line-height: 1.2; font-weight: 700; color: var(--tl-ink); }
+    .tl-sub { margin: 0 0 18px 42px; font-size: 14px; color: var(--tl-muted); }
+
+    .tl-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--tl-line); padding-bottom: 8px; }
+    .tl-group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .tl-view { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--tl-muted); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+    .tl-view svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .tl-view:hover { background: #EFEFED; }
+    .tl-view[aria-selected="true"] { color: var(--tl-ink); background: #EFEFED; font-weight: 600; }
+
+    .tl-ghost, .tl-search input { height: 34px; margin: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #4B5563; font: inherit; font-size: 13.5px; }
+    .tl-ghost { width: auto; padding: 0 26px 0 10px; cursor: pointer; appearance: none; -webkit-appearance: none;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' fill='none' stroke='%236B7280' stroke-width='1.6'/></svg>"); background-repeat: no-repeat; background-position: right 9px center; }
+    .tl-ghost:hover { background-color: #EFEFED; }
+    .tl-search { position: relative; display: block; margin: 0; }
+    .tl-search svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; fill: none; stroke: #9CA3AF; stroke-width: 1.8; stroke-linecap: round; pointer-events: none; }
+    .tl-search input { width: 170px; padding: 0 10px 0 30px; border-color: var(--tl-line); background: #fff; transition: width .15s ease; }
+    .tl-search input:focus { width: 230px; outline: 2px solid var(--tl-maroon); outline-offset: 0; }
+    .tl-new { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 6px; background: #6B0F1A; color: #fff; font-size: 13.5px; font-weight: 600; text-decoration: none; margin-left: 4px; }
+    .tl-new:hover { background: #570C15; }
+
+    .tl-cats { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 20px; border-bottom: 1px solid var(--tl-line); }
+    .tl-tabs { display: flex; gap: 2px; overflow-x: auto; }
+    .tl-tab { padding: 10px 11px 9px; border: 0; border-bottom: 2px solid transparent; border-radius: 6px 6px 0 0; background: transparent; color: var(--tl-muted); font: inherit; font-size: 14px; white-space: nowrap; cursor: pointer; margin-bottom: -1px; }
+    .tl-tab:hover { background: #EFEFED; }
+    .tl-cats .td { margin-bottom: 0; }
+    .tl-tab .n { font-variant-numeric: tabular-nums; }
+    .tl-tab[aria-selected="true"] { color: var(--tl-ink); font-weight: 700; border-bottom-color: var(--tl-maroon); }
+    .tl-feat { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 13px; color: var(--tl-muted); cursor: pointer; user-select: none; }
+    .tl-feat input { appearance: none; -webkit-appearance: none; width: 30px; height: 18px; margin: 0; padding: 0; border: 0; border-radius: 9px; background: #D1D5DB; position: relative; cursor: pointer; transition: background .15s; }
+    .tl-feat input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .15s; }
+    .tl-feat input:checked { background: var(--tl-maroon); }
+    .tl-feat input:checked::after { transform: translateX(12px); }
+
+    /* grid */
+    .tl-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
+    @media (max-width: 1000px) { .tl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 640px) { .tl-grid { grid-template-columns: 1fr; } }
+
+    .tl-card { --wash: #fff; position: relative; display: flex; flex-direction: column; min-width: 0; background: #fff; border: 1px solid var(--tl-line); border-radius: 8px; overflow: hidden; color: inherit; text-decoration: none; transition: transform .15s ease, background-color .15s ease, border-color .15s ease; }
+    .tl-card[hidden] { display: none; }
+    .tl-card:hover { transform: translateY(-2px); background: #F7F7F5; border-color: #D1D5DB; }
+    .tl-card:focus-visible { outline: 2px solid var(--tl-maroon); outline-offset: 2px; }
+    .tl-card.no-img { background: color-mix(in srgb, var(--wash) 50%, #fff); }
+    .tl-card.no-img:hover { background: color-mix(in srgb, var(--wash) 65%, #fff); }
+    .tl-cover { height: 170px; border-bottom: 1px solid var(--tl-line); background: #EFEFED; overflow: hidden; }
+    .tl-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+    .tl-side { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+    .tl-body { flex: 1; padding: 14px 16px 10px; min-width: 0; }
+    .tl-pill { display: inline-block; margin-bottom: 8px; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; line-height: 18px; background: var(--bg); color: var(--fg); }
+    .tl-title { font-family: var(--font-head); font-size: 18px; line-height: 1.3; font-weight: 700; color: var(--tl-ink); margin: 0 0 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .tl-excerpt { margin: 0; font-size: 14px; line-height: 1.5; color: var(--tl-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .tl-quote { margin: 6px 0 0; font-family: var(--font-head); font-size: 17px; line-height: 1.5; color: var(--fg); font-style: italic; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
+    .tl-quote::before { content: "\201C"; display: block; font-size: 44px; line-height: .8; font-style: normal; opacity: .55; margin-bottom: 2px; }
+    .tl-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 16px 14px; font-size: 13px; color: var(--tl-muted); }
+    .tl-by { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: #374151; font-weight: 500; }
+    .tl-by span.nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tl-av { flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%; background: var(--bg); color: var(--fg); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; overflow: hidden; }
+    .tl-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .tl-meta { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .tl-ok { display: inline-flex; align-items: center; gap: 5px; color: #1E6034; font-weight: 500; }
+    .tl-ok::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #22C55E; }
+
+    /* featured top story: 2 columns, cover left, text right */
+    .tl-card.tl-featured { grid-column: span 2; flex-direction: row; }
+    .tl-featured .tl-cover { flex: 0 0 56%; height: auto; aspect-ratio: 16 / 9; border-bottom: 0; border-right: 1px solid var(--tl-line); }
+    .tl-featured .tl-body { padding: 20px 22px 8px; }
+    .tl-featured .tl-title { font-size: 26px; -webkit-line-clamp: 3; }
+    .tl-featured .tl-excerpt { font-size: 15px; -webkit-line-clamp: 3; }
+    .tl-featured .tl-foot { padding: 10px 22px 18px; }
+    .tl-featured.no-img .tl-quote { font-size: 20px; }
+    @media (max-width: 1000px) and (min-width: 641px) { .tl-featured .tl-cover { flex-basis: 50%; } }
+    @media (max-width: 640px) { .tl-card.tl-featured { grid-column: auto; flex-direction: column; } .tl-featured .tl-cover { flex: none; width: 100%; border-right: 0; border-bottom: 1px solid var(--tl-line); } }
+
+    /* list view: compact rows */
+    .tl-grid.is-list { grid-template-columns: 1fr; gap: 0; border: 1px solid var(--tl-line); border-radius: 8px; background: #fff; overflow: hidden; }
+    .is-list .tl-card, .is-list .tl-card.no-img { flex-direction: row; align-items: center; border: 0; border-bottom: 1px solid var(--tl-line); border-radius: 0; background: #fff; }
+    .is-list .tl-card:last-child { border-bottom: 0; }
+    .is-list .tl-card:hover { transform: none; background: #F7F7F5; }
+    .is-list .tl-cover, .is-list .tl-excerpt, .is-list .tl-quote { display: none; }
+    .is-list .tl-side { flex-direction: row; align-items: center; }
+    .is-list .tl-body { display: flex; align-items: center; gap: 14px; padding: 10px 16px; }
+    .is-list .tl-pill { margin: 0; flex: 0 0 82px; text-align: center; }
+    .is-list .tl-title { margin: 0; font-size: 16px; -webkit-line-clamp: 1; }
+    .is-list .tl-foot { padding: 10px 16px; gap: 24px; }
+    .is-list .tl-by { width: 170px; }
+    @media (max-width: 700px) { .is-list .tl-foot .tl-ok { display: none; } .is-list .tl-by { width: auto; } }
+
+    /* board view: one column per category */
+    .tl-grid.is-board { display: flex; align-items: flex-start; gap: 16px; overflow-x: auto; padding-bottom: 8px; }
+    .tl-col { flex: 0 0 300px; min-width: 0; }
+    .tl-col-head { display: flex; align-items: center; gap: 8px; padding: 0 2px 10px; font-size: 13px; color: var(--tl-muted); font-variant-numeric: tabular-nums; }
+    .tl-col-cards { display: flex; flex-direction: column; gap: 12px; }
+
+    .tl-empty { display: none; padding: 48px 0; text-align: center; color: var(--tl-muted); }
+    .tl-empty b { display: block; font-family: var(--font-head); font-size: 20px; color: var(--tl-ink); margin-bottom: 4px; }
+    .tl-empty button { margin-top: 10px; padding: 6px 12px; border: 1px solid var(--tl-line); border-radius: 6px; background: #fff; font: inherit; font-size: 13px; cursor: pointer; }
+    @media (prefers-reduced-motion: reduce) { .tl-card, .tl-search input { transition: none; } .tl-card:hover { transform: none; } }
+</style>
+
+<div class="tl">
+    <div class="tl-band">
+    <div class="tl-head">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/></svg>
+        <h1>Timeline</h1>
     </div>
-    {% else %}
-    <p class="empty">Nothing on the timeline yet.</p>
-    {% endfor %}
+
+    <div class="tl-bar">
+        <div class="tl-group" role="tablist" aria-label="View">
+            <button type="button" class="tl-view" role="tab" data-view="gallery" aria-selected="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Gallery View</button>
+            <button type="button" class="tl-view" role="tab" data-view="board" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="4" height="15" rx="1"/></svg>Board View</button>
+            <button type="button" class="tl-view" role="tab" data-view="list" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>List View</button>
+        </div>
+        <div class="tl-group">
+            <select class="tl-ghost" id="tl-sort" aria-label="Sort">
+                <option value="new">Sort: Newest first</option>
+                <option value="old">Sort: Oldest first</option>
+                <option value="az">Sort: Title A to Z</option>
+            </select>
+            <select class="tl-ghost" id="tl-author" aria-label="Filter by author">
+                <option value="">Author: Everyone</option>
+                {% for a in authors %}<option value="{{ a|lower }}">{{ a }}</option>{% endfor %}
+            </select>
+            <label class="tl-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+                <input type="search" id="tl-q" placeholder="Search" aria-label="Search stories"></label>
+            {% if session.role in WORKERS %}<a class="tl-new" href="{{ url_for('create') }}">+ New Output</a>{% endif %}
+        </div>
+    </div>
+
+    <div class="tl-cats">
+        <div class="tl-tabs" role="tablist" aria-label="Category">
+            <button type="button" class="tl-tab" role="tab" data-cat="" aria-selected="true">All <span class="n">(<span data-count="">{{ posts|length }}</span>)</span></button>
+            {% for c in categories %}
+            <button type="button" class="tl-tab" role="tab" data-cat="{{ c }}" aria-selected="false">{{ c }} <span class="n">(<span data-count="{{ c }}">0</span>)</span></button>
+            {% endfor %}
+        </div>
+        <label class="tl-feat"><input type="checkbox" id="tl-feat" checked> Featured top story</label>
+    </div>
+
+    </div>
+
+    <div class="tl-grid" id="tl-grid">
+        {% for p in posts %}
+        {% set c = CAT[p.cat] %}
+        {% set img = p.images[0] if p.images else None %}
+        <a class="tl-card {{ 'has-img' if img else 'no-img' }}" href="{{ url_for('view_post', post_id=p.id) }}"
+            style="--bg: {{ c[0] }}; --fg: {{ c[1] }}; --wash: {{ c[0] }};"
+            data-cat="{{ p.cat }}" data-author="{{ (p.author or '')|lower }}" data-title="{{ p.title|lower }}"
+            data-ts="{{ p.shown_at.timestamp()|int }}" data-search="{{ p.search }}">
+            {% if img %}<div class="tl-cover"><img src="{{ url_for('uploads', filename=img) }}" alt="" loading="lazy"></div>{% endif %}
+            <div class="tl-side">
+                <div class="tl-body">
+                    <span class="tl-pill">{{ p.cat }}</span>
+                    <h3 class="tl-title">{{ p.title }}</h3>
+                    {% if img %}
+                    <p class="tl-excerpt">{{ p.excerpt }}</p>
+                    {% else %}
+                    <p class="tl-quote">{{ p.quote }}</p>
+                    {% endif %}
+                </div>
+                <div class="tl-foot">
+                    <span class="tl-by">
+                        <span class="tl-av">{% if p.pic %}<img src="{{ p.pic }}" alt="" referrerpolicy="no-referrer">{% else %}{{ (p.author or '?')[:1]|upper }}{% endif %}</span>
+                        <span class="nm">{{ p.author or 'Unknown' }}</span>
+                    </span>
+                    <span class="tl-meta"><span title="Approved">{{ p.shown_at.strftime('%b %d, %Y, %I:%M %p').replace(' 0', ' ') }}</span><span class="tl-ok">Approved</span></span>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    <div class="tl-empty" id="tl-empty">
+        <b>{{ 'No stories match.' if posts else 'Nothing on the timeline yet.' }}</b>
+        {% if posts %}Try another category or clear the search.<br><button type="button" id="tl-clear">Clear filters</button>{% else %}Approved stories appear here.{% endif %}
+    </div>
 </div>
+
+<script>
+(function () {
+    var grid = document.getElementById('tl-grid'), empty = document.getElementById('tl-empty');
+    var cards = [].slice.call(grid.querySelectorAll('.tl-card'));
+    var ORDER = {{ categories|tojson }};
+    var COLORS = {{ CAT|tojson }};
+    var st = { view: 'gallery', cat: '', sort: 'new', author: '', q: '', feat: true };
+    try { st.view = localStorage.getItem('cd_tl_view') || 'gallery'; st.feat = localStorage.getItem('cd_tl_feat') !== '0'; } catch (e) { }
+    if (['gallery', 'board', 'list'].indexOf(st.view) < 0) st.view = 'gallery';
+    var featBox = document.getElementById('tl-feat'); featBox.checked = st.feat;
+
+    function matches(c, ignoreCat) {
+        if (!ignoreCat && st.cat && c.dataset.cat !== st.cat) return false;
+        if (st.author && c.dataset.author !== st.author) return false;
+        if (st.q && c.dataset.search.indexOf(st.q) < 0) return false;
+        return true;
+    }
+    function apply() {
+        // counts on the category tabs follow the author filter and the search
+        var counts = {}, total = 0;
+        cards.forEach(function (c) { if (matches(c, true)) { counts[c.dataset.cat] = (counts[c.dataset.cat] || 0) + 1; total++; } });
+        document.querySelectorAll('[data-count]').forEach(function (s) {
+            var k = s.getAttribute('data-count'); s.textContent = k === '' ? total : (counts[k] || 0);
+        });
+        document.querySelectorAll('.tl-tab').forEach(function (t) { t.setAttribute('aria-selected', t.dataset.cat === st.cat ? 'true' : 'false'); });
+        document.querySelectorAll('.tl-view').forEach(function (t) { t.setAttribute('aria-selected', t.dataset.view === st.view ? 'true' : 'false'); });
+
+        var shown = cards.filter(function (c) { return matches(c, false); });
+        shown.sort(function (a, b) {
+            if (st.sort === 'az') return a.dataset.title.localeCompare(b.dataset.title);
+            var d = (+a.dataset.ts) - (+b.dataset.ts); return st.sort === 'old' ? d : -d;
+        });
+        // reset: every card back in the grid, no board columns
+        [].slice.call(grid.querySelectorAll('.tl-col')).forEach(function (col) { col.remove(); });
+        cards.forEach(function (c) { c.classList.remove('tl-featured'); c.hidden = true; grid.appendChild(c); });
+        grid.classList.toggle('is-list', st.view === 'list');
+        grid.classList.toggle('is-board', st.view === 'board');
+
+        if (st.view === 'board') {
+            ORDER.forEach(function (cat) {
+                var group = shown.filter(function (c) { return c.dataset.cat === cat; });
+                if (!group.length) return;
+                var col = document.createElement('div'); col.className = 'tl-col';
+                var head = document.createElement('div'); head.className = 'tl-col-head';
+                var pill = document.createElement('span'); pill.className = 'tl-pill'; pill.style.margin = '0';
+                pill.style.setProperty('--bg', COLORS[cat][0]); pill.style.setProperty('--fg', COLORS[cat][1]); pill.textContent = cat;
+                var n = document.createElement('span'); n.textContent = group.length;
+                head.appendChild(pill); head.appendChild(n);
+                var list = document.createElement('div'); list.className = 'tl-col-cards';
+                group.forEach(function (c) { c.hidden = false; list.appendChild(c); });
+                col.appendChild(head); col.appendChild(list); grid.appendChild(col);
+            });
+        } else {
+            shown.forEach(function (c) { c.hidden = false; grid.appendChild(c); });
+            if (st.view === 'gallery' && st.feat && st.sort === 'new' && shown.length > 1) shown[0].classList.add('tl-featured');
+        }
+        empty.style.display = shown.length ? 'none' : 'block';
+    }
+
+    document.querySelectorAll('.tl-tab').forEach(function (t) { t.addEventListener('click', function () { st.cat = t.dataset.cat; apply(); }); });
+    document.querySelectorAll('.tl-view').forEach(function (t) {
+        t.addEventListener('click', function () { st.view = t.dataset.view; try { localStorage.setItem('cd_tl_view', st.view); } catch (e) { } apply(); });
+    });
+    document.getElementById('tl-sort').addEventListener('change', function () { st.sort = this.value; apply(); });
+    document.getElementById('tl-author').addEventListener('change', function () { st.author = this.value; apply(); });
+    var q = document.getElementById('tl-q');
+    q.addEventListener('input', function () { st.q = q.value.trim().toLowerCase(); apply(); });
+    featBox.addEventListener('change', function () { st.feat = featBox.checked; try { localStorage.setItem('cd_tl_feat', st.feat ? '1' : '0'); } catch (e) { } apply(); });
+    var clear = document.getElementById('tl-clear');
+    if (clear) clear.addEventListener('click', function () {
+        st.cat = ''; st.author = ''; st.q = ''; q.value = ''; document.getElementById('tl-author').value = ''; apply();
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); q.focus(); }
+    });
+    apply();
+})();
+</script>
 {% endblock %}

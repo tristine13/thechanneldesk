@@ -1,29 +1,114 @@
 {% extends "base.html" %}
-{% from "_macros.html" import status_badge %}
+{% from "_macros.html" import csrf with context %}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
-<h2 class="timeline-title centered">{{ title }}</h2>
-<div class="list center-list">
-    {% for p in posts %}
-    <div class="row">
-        <div>
-            <b>{{ p.title }}</b>
-            <div class="muted">by {{ p.author or 'Unknown' }} · {{ p.type }} · {{ p.created_at.strftime('%b %d, %Y') }}
-            </div>
-            {% if p.feedback and p.status in ('revise', 'rejected') %}
-            <div class="muted"><b>Feedback:</b> {{ p.feedback }}</div>
-            {% endif %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/editorial-lists.css') }}">
+{% set in_review = ('pending', 'with_eic', 'with_adviser') %}
+{% set is_submitted = title == 'Submitted' %}
+{% set labels = {'draft': 'Draft', 'pending': 'Copyedit', 'with_eic': 'With Editor-in-Chief',
+    'with_adviser': 'With Adviser', 'approved': 'Approved', 'rejected': 'Rejected', 'revise': 'Needs revision'} %}
+{% set TAGS = CAT_COLORS %}
+
+{% macro item(p) %}
+{% set grp = 'review' if p.status in in_review else ('approved' if p.status == 'approved' else ('revise' if p.status in ('revise', 'rejected') else 'draft')) %}
+{% set c = TAGS.get(p.type, ['#F1F1EF', '#5A5955']) %}
+<div class="el-row" data-group="{{ grp }}" data-q="{{ (p.title ~ ' ' ~ (p.type or '') ~ ' ' ~ (p.author or ''))|lower }}">
+    <div>
+        <a class="el-name" href="{{ url_for('view_post', post_id=p.id) }}">{{ p.title }}</a>
+        <div class="el-meta">
+            {% if p.type %}<span class="el-tag" style="background:{{ c[0] }};color:{{ c[1] }}">{{ p.type }}</span>{% endif %}
+            <span>{{ p.author or 'Unknown' }}</span>
+            <span title="{{ p.created_at.strftime('%b %d, %Y %I:%M %p') }}">{% if p.status == 'approved' and p.approved_at %}Approved {{ p.approved_at.strftime('%b %d, %Y') }}{% else %}{{ p.created_at.strftime('%b %d, %Y') }}{% endif %}</span>
+            {% if p.status == 'draft' %}<span class="words">{{ (p.content|plain|wordcount) }} words</span>{% endif %}
         </div>
-        <div class="row-right">
-            {{ status_badge(p.status) }}
-            <a class="read-more" href="{{ url_for('view_post', post_id=p.id) }}">Open→</a>
-            {% if p.user_id == session.user_id and p.status in EDITABLE_STATUSES %}
-            <a class="read-more" href="{{ url_for('create', post_id=p.id) }}">Edit→</a>
-            {% endif %}
-        </div>
+        {% if p.deck %}<div class="el-ex">{{ p.deck }}</div>
+        {% elif p.status == 'draft' %}{% set ex = p.content|plain|trim %}{% if ex %}<div class="el-ex">{{ ex|truncate(160) }}</div>{% endif %}{% endif %}
+        {% if p.feedback and p.status in ('revise', 'rejected') %}
+        <div class="el-fb"><b>Feedback:</b> {{ p.feedback }}</div>
+        {% endif %}
     </div>
-    {% else %}
-    <p class="empty">{{ empty }}</p>
-    {% endfor %}
+    <div class="el-side">
+        <span class="el-pill p-{{ p.status or 'draft' }}">{{ labels.get(p.status, 'Draft') }}</span>
+        {% if p.user_id == session.user_id and p.status in EDITABLE_STATUSES %}
+        <a class="el-act go" href="{{ url_for('create', post_id=p.id) }}">{{ 'Continue' if p.status == 'draft' else 'Edit' }}</a>
+        {% endif %}
+        <a class="el-act" href="{{ url_for('view_post', post_id=p.id) }}">Open</a>
+        {% if p.status == 'draft' and p.user_id == session.user_id %}
+        <form method="POST" action="{{ url_for('delete_draft', post_id=p.id) }}"
+            onsubmit="return confirm('Delete this draft? This cannot be undone.')">
+            {{ csrf() }}
+            <button class="el-del" title="Delete draft" aria-label="Delete draft">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13M9 7V4h6v3"/></svg>
+            </button>
+        </form>
+        {% endif %}
+        <span class="el-time" title="{{ p.created_at.strftime('%b %d, %Y %I:%M %p') }}">{{ p.created_at|ago }}</span>
+    </div>
 </div>
+{% endmacro %}
+
+{% set today_rows = posts|selectattr('is_today')|list %}
+{% set earlier_rows = posts|rejectattr('is_today')|list %}
+{% set n_review = posts|selectattr('status', 'in', in_review)|list|length %}
+{% set n_appr = posts|selectattr('status', 'equalto', 'approved')|list|length %}
+{% set n_rev = posts|selectattr('status', 'in', ('revise', 'rejected'))|list|length %}
+
+<div class="el">
+    <div class="el-wrap">
+        <div class="el-band">
+        <div class="el-titlebar">
+            <h1 class="el-title">{{ title }}</h1>
+            <div class="el-top-actions"><a class="el-btn solid" href="{{ url_for('create') }}">+ New output</a></div>
+        </div>
+
+        {% if posts %}
+        <div class="el-bar">
+            <div class="el-tabs" role="tablist">
+                {% if is_submitted %}
+                <button type="button" class="el-tab active" data-tab="all">All<span class="n">{{ posts|length }}</span></button>
+                <button type="button" class="el-tab" data-tab="review">In review<span class="n">{{ n_review }}</span></button>
+                <button type="button" class="el-tab" data-tab="approved">Approved<span class="n">{{ n_appr }}</span></button>
+                <button type="button" class="el-tab" data-tab="revise">Revise / Rejected<span class="n">{{ n_rev }}</span></button>
+                {% else %}
+                <button type="button" class="el-tab active" data-tab="all">All drafts<span class="n">{{ posts|length }}</span></button>
+                {% endif %}
+            </div>
+            <input class="el-search" type="search" id="el-q" placeholder="Search" aria-label="Search">
+        </div>
+        {% endif %}
+
+        </div>
+
+        {% if today_rows %}<div class="el-group"><div class="el-label">Today</div>{% for p in today_rows %}{{ item(p) }}{% endfor %}</div>{% endif %}
+        {% if earlier_rows %}<div class="el-group"><div class="el-label">Earlier</div>{% for p in earlier_rows %}{{ item(p) }}{% endfor %}</div>{% endif %}
+
+        {% if not posts %}
+        <div class="el-empty"><p>{{ empty }}</p><a class="el-btn solid" href="{{ url_for('create') }}">Start a new output</a></div>
+        {% endif %}
+        <div class="el-empty" id="el-none" hidden><p>Nothing matches.</p></div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var tabs = document.querySelectorAll('[data-tab]'), q = document.getElementById('el-q'), none = document.getElementById('el-none');
+    var kind = 'all';
+    function apply() {
+        var term = q ? q.value.trim().toLowerCase() : '', shown = 0;
+        document.querySelectorAll('.el-row').forEach(function (el) {
+            var ok = (kind === 'all' || el.dataset.group === kind) && (!term || el.dataset.q.indexOf(term) >= 0);
+            el.hidden = !ok; if (ok) shown++;
+        });
+        document.querySelectorAll('.el-group').forEach(function (g) { g.hidden = !g.querySelector('.el-row:not([hidden])'); });
+        if (none) none.hidden = shown > 0 || !document.querySelector('.el-row');
+    }
+    tabs.forEach(function (t) {
+        t.addEventListener('click', function () {
+            tabs.forEach(function (o) { o.classList.toggle('active', o === t); });
+            kind = t.dataset.tab; apply();
+        });
+    });
+    if (q) q.addEventListener('input', apply);
+})();
+</script>
 {% endblock %}

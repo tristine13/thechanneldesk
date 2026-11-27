@@ -1,7 +1,7 @@
 /* Drafts, Submitted and My Tasks: same tokens as the Create Output editor.
    White page, hairlines instead of shadows, serif headlines, maroon only for the primary action. */
 .el { --bg: #FFFFFF; --soft: #FBFBFA; --ink: #1F1F1F; --mute: #6B7280; --line: #E5E7EB; --hair: #EFEFED; --acc: #6B0F1A; --r: 6px; --head: 'Playfair Display', Georgia, serif;
-    background: #FBFBFA; color: var(--ink); margin: -20px -24px 0; min-height: 100vh; font-family: 'Inter', sans-serif; overflow-x: clip; }
+    background: #FBFBFA; color: var(--ink); margin: 0 -24px 0; min-height: 100vh; font-family: 'Inter', sans-serif; overflow-x: clip; }
 .el * { box-sizing: border-box; }
 .el-hd { position: sticky; top: 0; z-index: 35; height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 24px; background: #F5F3EE; border-bottom: 1px solid #E2E0D8; font-size: 13px; }
 .el-hd .crumb { color: var(--mute); }
@@ -17,6 +17,10 @@
 .el-band { position: relative; z-index: 20; isolation: isolate; margin-bottom: 4px; padding: 36px 0 0; }
 .el-band::before { content: ""; position: absolute; z-index: -1; top: 0; bottom: 0; left: -100vmax; right: -100vmax; background: #F5F3EE; border-bottom: 1px solid #E2E0D8; }
 .el-band .el-title { padding-bottom: 18px; }
+/* title on the left, page actions on the right (replaces the old breadcrumb bar above the band) */
+.el-titlebar { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.el-titlebar .el-title { min-width: 0; }
+.el-top-actions { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
 .el-band .el-bar { margin-top: 0; padding-bottom: 16px; border-bottom: 0; align-items: center; }
 .el-band .el-search { margin-bottom: 0; }
 .el-band .el-search { background: #fff; }

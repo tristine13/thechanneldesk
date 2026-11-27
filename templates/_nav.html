@@ -1,56 +1,85 @@
 {% set ep = request.endpoint %}
-<div class="side-brand">
-    <div class="side-user">{{ session.name }}
-        <br>
-        <span>{{ ROLE_LABELS.get(session.role, session.role) }}</span>
-    </div>
+<style>
+    .profile-avatar { overflow: hidden; }
+    .profile-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+</style>
+<div class="side-head">
+    <button type="button" class="side-logo" onclick="toggleSidebar()" title="Show / hide menu"
+        aria-label="Show or hide menu">
+        <img src="{{ url_for('static', filename='images/channellogo.png') }}" alt="The Channel Desk">
+        <span>The Channel Desk</span>
+    </button>
 </div>
 
 <nav class="side-nav">
-    <a href="{{ url_for('dashboard') }}" class="{{ 'active' if ep == 'dashboard' }}">Timeline</a>
+    <div class="side-group">Main</div>
+    <a href="{{ url_for('dashboard') }}" title="Timeline" class="{{ 'active' if ep == 'dashboard' }}">
+        <svg class="side-ico" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        <span class="side-label">Timeline</span>
+    </a>
+    {% if session.role in ANNOUNCE or session.role == 'admin' %}
+    <a href="{{ url_for('polls') }}" title="Polls" class="{{ 'active' if ep == 'polls' }}">
+        <svg class="side-ico" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+        <span class="side-label">Polls</span>
+    </a>
+    {% endif %}
 
+    {% if session.role != 'admin' %}{# the Admin only manages accounts and oversees: no works / task assigning #}
+    {% if session.role in WORKERS %}{# the Adviser only reviews: no outputs of their own #}
     <div class="side-group">My Work</div>
-    <a href="{{ url_for('create') }}" class="{{ 'active' if ep == 'create' }}">Create Output</a>
-    <a href="{{ url_for('drafts') }}" class="{{ 'active' if ep == 'drafts' }}">Drafts</a>
-    <a href="{{ url_for('submitted') }}" class="{{ 'active' if ep == 'submitted' }}">Submitted</a>
+    <a href="{{ url_for('create') }}" title="Create Output" class="{{ 'active' if ep == 'create' }}">
+        <svg class="side-ico" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg>
+        <span class="side-label">Create Output</span>
+    </a>
+    <a href="{{ url_for('drafts') }}" title="Drafts" class="{{ 'active' if ep == 'drafts' }}">
+        <svg class="side-ico" viewBox="0 0 24 24"><path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z"/><path d="M14 3v4h4M9 13h6M9 17h4"/></svg>
+        <span class="side-label">Drafts</span>
+    </a>
+    <a href="{{ url_for('submitted') }}" title="Submitted" class="{{ 'active' if ep == 'submitted' }}">
+        <svg class="side-ico" viewBox="0 0 24 24"><path d="M21 3L10 14"/><path d="M21 3l-7 18-4-7-7-4z"/></svg>
+        <span class="side-label">Submitted</span>
+    </a>
 
+    {% endif %}
     {% set task_eps = ['my_tasks', 'assign_task', 'assigned_tasks', 'admin_tasks'] %}
     <div class="side-dropdown {{ 'open' if ep in task_eps }}">
-        <button type="button" class="side-dropdown-btn {{ 'active-parent' if ep in task_eps }}"
+        <button type="button" title="Tasks" class="side-dropdown-btn {{ 'active-parent' if ep in task_eps }}"
             aria-expanded="{{ 'true' if ep in task_eps else 'false' }}"
             onclick="var d=this.parentNode,o=d.classList.toggle('open');this.setAttribute('aria-expanded',o)">
-            Tasks</button>
-        <div class="side-sub-wrap">
-            <div class="side-sub">
-                <a href="{{ url_for('my_tasks') }}" class="{{ 'active' if ep == 'my_tasks' }}">My Tasks</a>
-                {% if session.role in ASSIGN_TASKS %}
-                <a href="{{ url_for('assign_task') }}" class="{{ 'active' if ep == 'assign_task' }}">Assign a Task</a>
-                <a href="{{ url_for('assigned_tasks') }}" class="{{ 'active' if ep == 'assigned_tasks' }}">Tasks I
-                    Assigned</a>
-                {% endif %}
-                {% if session.role == 'admin' %}
-                <a href="{{ url_for('admin_tasks') }}" class="{{ 'active' if ep == 'admin_tasks' }}">All Tasks (Admin
-                    Overview)</a>
-                {% endif %}
-            </div>
-        </div>
+            <svg class="side-ico" viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h11"/></svg>
+            <span class="side-label">Tasks</span></button>
+        <div class="side-sub-wrap"><div class="side-sub">
+            {% if session.role in WORKERS %}<a href="{{ url_for('my_tasks') }}" class="{{ 'active' if ep == 'my_tasks' }}">My Tasks</a>{% endif %}
+            {% if session.role in ASSIGN_TASKS %}
+            <a href="{{ url_for('assign_task') }}" class="{{ 'active' if ep == 'assign_task' }}">Assign a Task</a>
+            <a href="{{ url_for('assigned_tasks') }}" class="{{ 'active' if ep == 'assigned_tasks' }}">Tasks I Assigned</a>
+            {% endif %}
+        </div></div>
     </div>
+    {% else %}
+    <div class="side-group">Overview</div>
+    <a href="{{ url_for('admin_tasks') }}" title="All Tasks" class="{{ 'active' if ep == 'admin_tasks' }}">
+        <svg class="side-ico" viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h11"/></svg>
+        <span class="side-label">All Tasks</span>
+    </a>
+    {% endif %}
 
     {% if session.role in REVIEWERS %}
     <div class="side-group">Approvals</div>
-    <a href="{{ url_for('review_queue') }}" class="{{ 'active' if ep == 'review_queue' }}">
-        Approvals Dashboard
+    <a href="{{ url_for('review_queue') }}" title="Approvals Dashboard" class="{{ 'active' if ep == 'review_queue' }}">
+        <svg class="side-ico" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>
+        <span class="side-label">Approvals Dashboard</span>
         {% if approval_count > 0 %}<span class="side-badge">{{ approval_count }}</span>{% endif %}
     </a>
     {% endif %}
 
     {% if session.role == 'admin' %}
     <div class="side-group">Admin</div>
-    <a href="{{ url_for('admin') }}" class="{{ 'active' if ep == 'admin' }}">Admin Panel</a>
+    <a href="{{ url_for('admin') }}" title="Admin Panel" class="{{ 'active' if ep == 'admin' }}">
+        <svg class="side-ico" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.5 3-5.5 6.5-5.5s5.9 2 6.5 5.5"/><path d="M17 5a3.5 3.5 0 0 1 0 7M18.5 14.7c2 .6 3.4 2.4 3.9 5.3"/></svg>
+        <span class="side-label">Admin Panel</span>
+    </a>
     {% endif %}
-
-    <div class="side-group">Updates</div>
-    <a href="{{ url_for('announcements') }}" class="{{ 'active' if ep == 'announcements' }}">Announcements</a>
 </nav>
 
 <div class="side-profile" id="sideProfile">
@@ -58,34 +87,40 @@
         <div class="profile-email">{{ session.email }}</div>
         <div class="profile-role">{{ ROLE_LABELS.get(session.role, session.role) }}</div>
         <a href="{{ url_for('notifications') }}" role="menuitem" class="{{ 'active' if ep == 'notifications' }}">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.7 21a2 2 0 0 1-3.4 0" />
-            </svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
             <span>Notifications</span>
             {% if notif_count > 0 %}<span class="side-badge">{{ notif_count }}</span>{% endif %}
         </a>
         <div class="profile-divider"></div>
         <a href="{{ url_for('logout') }}" role="menuitem">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <path d="M16 17l5-5-5-5" />
-                <path d="M21 12H9" />
-            </svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
             <span>Log out</span>
         </a>
     </div>
     <button type="button" class="profile-btn" aria-haspopup="true" aria-expanded="false">
-        <span class="profile-avatar">{{ (session.name or session.email or '?')[:1]|upper }}</span>
-        <span class="profile-name">{{ session.name }}<small> · {{ ROLE_LABELS.get(session.role, session.role)
-                }}</small></span>
+        <span class="profile-avatar">{% if session.picture %}<img src="{{ session.picture }}" alt="" referrerpolicy="no-referrer">{% else %}{{ (session.name or session.email or '?')[:1]|upper }}{% endif %}</span>
+        <span class="profile-name">{{ session.name }}<small> · {{ ROLE_LABELS.get(session.role, session.role) }}</small></span>
         {% if notif_count > 0 %}<span class="profile-dot"></span>{% endif %}
-        <svg class="profile-chev" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M6 9l6 6 6-6" />
-        </svg>
+        <svg class="profile-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
     </button>
 </div>
 <script>
+    (function () {          // icon rail: the Tasks card opens and closes with clicks only
+        var dd = document.querySelector('.side-dropdown');
+        if (!dd) return;
+        var btn = dd.querySelector('.side-dropdown-btn');
+        function rail() { return document.body.classList.contains('sidebar-collapsed'); }
+        function shut() { dd.classList.remove('open'); if (btn) btn.setAttribute('aria-expanded', 'false'); }
+        if (rail()) shut();                                   // never start with the card open over the page
+        document.addEventListener('click', function (e) { if (rail() && !dd.contains(e.target)) shut(); });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && rail()) shut(); });
+        var t = window.toggleSidebar;
+        if (t) window.toggleSidebar = function () { t(); if (rail()) shut(); };
+    })();
+    (function () {          // keep the current page's menu item in view when the menu is taller than the window
+        var on = document.querySelector('.side-nav a.active');
+        if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+    })();
     (function () {
         var box = document.getElementById('sideProfile');
         if (!box) return;

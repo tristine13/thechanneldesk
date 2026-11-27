@@ -1,168 +1,119 @@
 {% extends "base.html" %}
-{% from "_macros.html" import status_badge, csrf with context %}
+{% from "_macros.html" import csrf with context %}
 {% block title %}Approvals{% endblock %}
-{% block bodyclass %}apv-page{% endblock %}
 {% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/editorial-lists.css') }}">
+{% set TAGS = CAT_COLORS %}
+{% set labels = {'draft': 'Draft', 'pending': 'Copyedit', 'with_eic': 'With Editor-in-Chief',
+    'with_adviser': 'With Adviser', 'approved': 'Approved', 'rejected': 'Rejected', 'revise': 'Needs revision'} %}
 
-{# One work: title + meta + status on the first row, feedback callout, then the review bar. #}
-{% macro work_card(p) %}
-<article class="apv-item" data-status="{{ p.status }}">
-    <div class="apv-item-top">
-        <div class="apv-item-main">
-            <h3 class="apv-item-title">{{ p.title }}</h3>
-            <div class="apv-meta">
-                <span>{{ p.author or 'Unknown' }}</span><span class="apv-dot">•</span>
-                <span>{{ p.type }}</span><span class="apv-dot">•</span>
-                <span>{{ p.created_at.strftime('%b %d, %Y') }}</span>
-            </div>
+{# every work in one list, newest first; the tabs filter it by stage #}
+{% set all = [] %}
+{% for key, label, rows in sections %}{% for p in rows %}{% set _ = all.append(p) %}{% endfor %}{% endfor %}
+{% for key, label, rows in outcomes %}{% for p in rows %}{% set _ = all.append(p) %}{% endfor %}{% endfor %}
+{% set all = all|sort(attribute='sort_at', reverse=true) %}
+{% set arch_rows = archived or [] %}
+{% set today_rows = all|selectattr('is_today')|list %}
+{% set earlier_rows = all|rejectattr('is_today')|list %}
+{% set wait_n = all|selectattr('can_act')|list|length %}
+
+{% macro item(p) %}
+{% set grp = 'archive' if p.archived_at else ('revise' if p.status in ('revise', 'rejected') else p.status) %}
+{% set c = TAGS.get(p.type, ['#F1F1EF', '#5A5955']) %}
+<div class="el-row" data-group="{{ grp }}" data-q="{{ (p.title ~ ' ' ~ (p.type or '') ~ ' ' ~ (p.author or ''))|lower }}">
+    <div>
+        <a class="el-name" href="{{ url_for('view_post', post_id=p.id) }}">{{ p.title }}{% if p.can_act %}<i class="el-dot" title="Waiting for your approval"></i>{% endif %}</a>
+        <div class="el-meta">
+            {% if p.type %}<span class="el-tag" style="background:{{ c[0] }};color:{{ c[1] }}">{{ p.type }}</span>{% endif %}
+            <span>{{ p.author or 'Unknown' }}</span>
+            {% set when = p.sort_at or p.created_at %}
+            <span title="{{ when.strftime('%b %d, %Y %I:%M %p') }}">{{ when.strftime('%b %d, %Y') }}</span>
         </div>
-        <div class="apv-item-side">
-            {{ status_badge(p.status) }}
-            <a class="apv-open" href="{{ url_for('view_post', post_id=p.id) }}">Open →</a>
-        </div>
+        {% if p.deck %}<div class="el-ex">{{ p.deck }}</div>{% endif %}
+        {% if p.feedback and p.status in ('revise', 'rejected') %}
+        <div class="el-fb"><b>Feedback:</b> {{ p.feedback }}</div>
+        {% endif %}
     </div>
-
-    {% if p.feedback and p.status in ('revise', 'rejected') %}
-    <div class="apv-feedback {{ p.status }}">
-        <div class="apv-fb-label">Editor's feedback</div>
-        <p>{{ p.feedback }}</p>
+    <div class="el-side">
+        {% if p.archived_at %}<span class="el-pill p-draft">Archived</span>{% else %}<span class="el-pill p-{{ p.status }}">{{ labels.get(p.status, 'Draft') }}</span>{% endif %}
+        <a class="el-act" href="{{ url_for('view_post', post_id=p.id) }}">Open</a>
+        {% if can_archive and p.status == 'approved' %}
+        <form method="POST" action="{{ url_for('unarchive_work' if p.archived_at else 'archive_work', post_id=p.id) }}"
+            {% if not p.archived_at %}onsubmit="return confirm('Archive this work? It leaves the Timeline and the student site, but is kept here and can be restored.')"{% endif %}>
+            {{ csrf() }}
+            <button class="el-act">{{ 'Restore' if p.archived_at else 'Archive' }}</button>
+        </form>
+        {% endif %}
+        <span class="el-time" title="{{ when.strftime('%b %d, %Y %I:%M %p') }}">{{ when|ago }}</span>
     </div>
-    {% endif %}
-
     {% if p.can_act %}
-    <form method="POST" action="{{ url_for('review_post', post_id=p.id) }}" class="apv-review">
+    <form class="el-review" method="POST" action="{{ url_for('review_post', post_id=p.id) }}">
         {{ csrf() }}
-        <input type="text" name="feedback" class="apv-fb-input" aria-label="Feedback"
-            placeholder="Feedback (required to Revise or Reject)" autocomplete="off">
-        <button name="action" value="approve" class="apv-btn apv-btn-primary">{{ APPROVE_LABELS[p.status] }}</button>
-        <button name="action" value="revise" class="apv-btn apv-btn-line" data-needs-feedback
-            title="Write feedback first">Revise</button>
-        <button name="action" value="reject" class="apv-btn apv-btn-danger" data-needs-feedback
-            title="Write feedback first">Reject</button>
+        <input type="text" name="feedback" placeholder="Feedback (required for Revise / Reject)" aria-label="Feedback">
+        <button name="action" value="approve" class="el-act ok">{{ APPROVE_LABELS[p.status] }}</button>
+        <button name="action" value="revise" class="el-act">Revise</button>
+        <button name="action" value="reject" class="el-act no">Reject</button>
     </form>
     {% endif %}
-</article>
+</div>
 {% endmacro %}
 
-{% set stage_keys = stages|map(attribute=0)|list %}
-{% set panels = [('action', 'Action Required', action_rows|length, action_rows, 'Nothing needs your approval right now.'),
-                 ('all', 'All Pending', pending_rows|length, pending_rows, 'No works are waiting in review.')] %}
-{% if show_outcomes %}
-{% set panels = panels + [('revise', 'Needs Revision', counts.revise, outcome_rows.get('revise', []), 'No works need revision.'),
-                          ('approved', 'Approved', counts.approved, outcome_rows.get('approved', []), 'Nothing approved yet.'),
-                          ('rejected', 'Rejected', counts.rejected, outcome_rows.get('rejected', []), 'Nothing has been rejected.')] %}
-{% endif %}
+<div class="el">
+    <div class="el-wrap">
+        <div class="el-band">
+        <h1 class="el-title">Approvals Dashboard</h1>
 
-<div class="apv">
-
-    {# ---- title row ---- #}
-    <div class="apv-head">
-        <div>
-            <h1 class="apv-title">Approvals Dashboard</h1>
-            <ol class="apv-flow" aria-label="Approval workflow">
-                <li class="apv-step">Staff</li>
-                {% for key, label, who in [('pending', 'News Editor', 'pending'), ('with_eic', 'Editor-in-Chief', 'with_eic'), ('with_adviser', 'Adviser', 'with_adviser')] %}
-                <li class="apv-step {{ 'mine' if key in highlight }}">
-                    {{ label }}{% if key in stage_keys %}<span class="apv-step-n">{{ counts[key] }}</span>{% endif %}
-                </li>
+        <div class="el-bar">
+            <div class="el-tabs" role="tablist">
+                <button type="button" class="el-tab active" data-tab="all">All<span class="n">{{ all|length }}</span></button>
+                {% for key, label in stages %}
+                <button type="button" class="el-tab" data-tab="{{ key }}">{{ label }}<span class="n">{{ counts[key] }}</span></button>
                 {% endfor %}
-                <li class="apv-step">Published{% if show_outcomes %}<span class="apv-step-n">{{ counts.approved }}</span>{% endif %}</li>
-            </ol>
+                {% if can_archive %}
+                <button type="button" class="el-tab" data-tab="approved">Approved<span class="n">{{ counts.approved }}</span></button>
+                <button type="button" class="el-tab" data-tab="archive">Archive<span class="n">{{ counts.archived }}</span></button>
+                {% endif %}
+                {% if show_outcomes %}
+                <button type="button" class="el-tab" data-tab="revise">Revise / Rejected<span class="n">{{ counts.revise + counts.rejected }}</span></button>
+                {% endif %}
+            </div>
+            <input class="el-search" type="search" id="el-q" placeholder="Search" aria-label="Search">
         </div>
-        <div class="apv-role">Role: <b>{{ ROLE_LABELS.get(session.role, session.role) }}</b></div>
+
+        </div>
+
+        {% if today_rows %}<div class="el-group"><div class="el-label">Today</div>{% for p in today_rows %}{{ item(p) }}{% endfor %}</div>{% endif %}
+        {% if earlier_rows %}<div class="el-group"><div class="el-label">Earlier</div>{% for p in earlier_rows %}{{ item(p) }}{% endfor %}</div>{% endif %}
+
+        {% if arch_rows %}<div class="el-group"><div class="el-label">Archived</div>{% for p in arch_rows %}{{ item(p) }}{% endfor %}</div>{% endif %}
+
+        {% if not all and not arch_rows %}<div class="el-empty"><p>Nothing to review.</p></div>{% endif %}
+        <div class="el-empty" id="el-none" hidden><p>Nothing matches.</p></div>
     </div>
-
-    {% if session.role == 'admin' %}
-    <p class="apv-viewonly">View only: the Admin can follow every stage but can't approve, revise or reject works.</p>
-    {% endif %}
-
-    {# ---- compact notification ---- #}
-    {% if waiting %}
-    <div class="apv-callout" role="status">
-        <span class="apv-callout-text"><b>{{ waiting }}</b> work{{ 's' if waiting != 1 }} waiting for your approval</span>
-        <button type="button" class="apv-btn apv-btn-primary apv-btn-sm" data-jump="action">Review now</button>
-    </div>
-    {% endif %}
-
-    {# ---- KPI row (colors match the admin panel) ---- #}
-    <div class="apv-kpi">
-        {% for key, label in stages %}
-        <div class="apv-kcard {{ 'mine' if key in highlight }}">
-            <div class="apv-kv k-stage">{{ counts[key] }}</div>
-            <div class="apv-kl">{{ label }}</div>
-        </div>
-        {% endfor %}
-        {% if show_outcomes %}
-        <div class="apv-kcard">
-            <div class="apv-kv k-approved">{{ counts.approved }}</div>
-            <div class="apv-kl">Approved</div>
-        </div>
-        <div class="apv-kcard">
-            <div class="apv-kv k-revise">{{ counts.revise }}</div>
-            <div class="apv-kl">Needs Revision</div>
-        </div>
-        <div class="apv-kcard">
-            <div class="apv-kv k-rejected">{{ counts.rejected }}</div>
-            <div class="apv-kl">Rejected</div>
-        </div>
-        {% endif %}
-    </div>
-
-    {# ---- tabs ---- #}
-    <div class="apv-tabs" role="tablist" aria-label="Queue">
-        {% for key, label, n, rows, empty in panels %}
-        <button type="button" role="tab" id="tab-{{ key }}" class="apv-tab {{ 'on' if loop.first }}"
-            aria-selected="{{ 'true' if loop.first else 'false' }}" aria-controls="panel-{{ key }}"
-            data-tab="{{ key }}">{{ label }}<span class="apv-tab-n">{{ n }}</span></button>
-        {% endfor %}
-    </div>
-
-    {% for key, label, n, rows, empty in panels %}
-    <section class="apv-panel" id="panel-{{ key }}" role="tabpanel" aria-labelledby="tab-{{ key }}"
-        {{ 'hidden' if not loop.first }}>
-        {% for p in rows %}{{ work_card(p) }}{% else %}<div class="apv-empty">{{ empty }}</div>{% endfor %}
-        {% if key in ('revise', 'approved', 'rejected') and n > rows|length %}
-        <p class="apv-more">Showing the latest {{ rows|length }} of {{ n }}.</p>
-        {% endif %}
-    </section>
-    {% endfor %}
 </div>
 
 <script>
-    (function () {
-        var tabs = document.querySelectorAll('.apv-tab');
-        var panels = document.querySelectorAll('.apv-panel');
-        function show(key) {
-            tabs.forEach(function (t) {
-                var on = t.getAttribute('data-tab') === key;
-                t.classList.toggle('on', on);
-                t.setAttribute('aria-selected', on);
-            });
-            panels.forEach(function (p) { p.hidden = p.id !== 'panel-' + key; });
-        }
-        tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.getAttribute('data-tab')); }); });
-
-        var jump = document.querySelector('[data-jump]');
-        if (jump) jump.addEventListener('click', function () {
-            show(jump.getAttribute('data-jump'));
-            var el = document.getElementById('panel-' + jump.getAttribute('data-jump'));
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+(function () {
+    var tabs = document.querySelectorAll('[data-tab]'), q = document.getElementById('el-q'), none = document.getElementById('el-none');
+    var kind = 'all';
+    function apply() {
+        var term = q ? q.value.trim().toLowerCase() : '', shown = 0;
+        document.querySelectorAll('.el-row').forEach(function (el) {
+            var inTab = kind === 'all' ? el.dataset.group !== 'archive' : el.dataset.group === kind;     // 'All' leaves archived works out
+            var ok = inTab && (!term || el.dataset.q.indexOf(term) >= 0);
+            el.hidden = !ok; if (ok) shown++;
         });
-
-        // Revise / Reject need feedback: disabled until something is typed
-        document.querySelectorAll('.apv-review').forEach(function (form) {
-            var input = form.querySelector('.apv-fb-input');
-            var gated = form.querySelectorAll('[data-needs-feedback]');
-            function sync() {
-                var ok = input.value.trim().length > 0;
-                gated.forEach(function (b) {
-                    b.disabled = !ok;
-                    b.title = ok ? '' : 'Write feedback first';
-                });
-            }
-            input.addEventListener('input', sync);
-            sync();
+        document.querySelectorAll('.el-group').forEach(function (g) { g.hidden = !g.querySelector('.el-row:not([hidden])'); });
+        if (none) none.hidden = shown > 0 || !document.querySelector('.el-row');
+    }
+    tabs.forEach(function (t) {
+        t.addEventListener('click', function () {
+            tabs.forEach(function (o) { o.classList.toggle('active', o === t); });
+            kind = t.dataset.tab; apply();
         });
-    })();
+    });
+    if (q) q.addEventListener('input', apply);
+    apply();                                      // hides archived works until the Archive tab is opened
+})();
 </script>
 {% endblock %}

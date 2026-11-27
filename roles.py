@@ -14,7 +14,7 @@ ROLE_LABELS = {
     ADMIN: "Admin",
     ADVISER: "Adviser",
     EIC: "Editor-in-Chief",
-    NEWS_EDITOR: "News Editor",
+    NEWS_EDITOR: "Editor",
     STAFF: "Staff",
 }
 # Roles an admin can hand out from the Admin Panel (Admin is NOT assignable)
@@ -25,7 +25,7 @@ POSITIONS = ["Writer", "Photojournalist", "Layout Artist"]
 # draft, pending, with_eic, with_adviser, approved, rejected, revise
 STATUS_LABELS = {
     "draft": "Draft",
-    "pending": "Pending: News Editor",
+    "pending": "Pending: Editor",
     "with_eic": "Pending: Editor-in-Chief",
     "with_adviser": "Pending: Adviser",
     "approved": "Approved",
@@ -47,8 +47,8 @@ NEXT_STATUS = {               # what "Approve" does at each stage
     "with_adviser": "approved",
 }
 APPROVE_LABELS = {
-    "pending": "Approve → Editor-in-Chief",
-    "with_eic": "Approve → Adviser",
+    "pending": "Approve",
+    "with_eic": "Approve",
     "with_adviser": "Approve (Final)",
 }
 ACTION_LABELS = {"approve": "Approve", "revise": "Revise", "reject": "Reject"}
@@ -56,8 +56,9 @@ ACTION_LABELS = {"approve": "Approve", "revise": "Revise", "reject": "Reject"}
 # Who may do what
 REVIEWERS = {ADMIN, NEWS_EDITOR, EIC, ADVISER}   # may open the Approvals dashboard
 SEE_ALL_POSTS = REVIEWERS                        # may open any *submitted* output
-ASSIGN_TASKS = {EIC, ADVISER}                    # Admin is view-only for tasks
-ANNOUNCE = {ADMIN, ADVISER, EIC}
+ASSIGN_TASKS = {EIC, ADVISER}                    # the Admin doesn't assign tasks
+WORKERS = {EIC, NEWS_EDITOR, STAFF}              # roles that write / submit works and have their own tasks (the Adviser only reviews)
+ANNOUNCE = {ADVISER, EIC}                        # only they may post announcements (Admin can't)
 MANAGE_USERS = {ADMIN}
 
 # What each reviewer sees on the Approvals Dashboard (and may open): only the works
@@ -83,9 +84,9 @@ def visible_stages(role):
 def can_act(role, post, user_id):
     """May this user approve / revise / reject this post right now?
 
-    Only the reviewer for the post's current stage can act. The Admin is view-only:
-    they can see every stage but never approve, revise or reject. Nobody reviews
-    their own work.
+    Only the reviewer for the post's current stage can act. The Admin oversees
+    the system but is view-only: no approving, revising or rejecting.
+    Nobody reviews their own work.
     """
     if post["user_id"] == user_id:
         return False
