@@ -6,3 +6,7 @@ uploads/
 __pycache__/
 index.php
 schema.sql
+*.sql
+import_to_tidb.py
+migrate_uploads_to_db.py
+add_admin.py

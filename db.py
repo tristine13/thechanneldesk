@@ -9,6 +9,21 @@ from flask import g
 from pymysql.cursors import DictCursor
 
 
+def _ssl_options():
+    """Cloud databases (TiDB Cloud) only accept encrypted connections: set DB_SSL=true in .env.
+    Locally (XAMPP) leave DB_SSL unset and nothing changes."""
+    if os.getenv("DB_SSL", "").strip().lower() not in ("1", "true", "yes"):
+        return {}
+    ca = os.getenv("DB_SSL_CA")                 # optional path to a CA file
+    if not ca:
+        try:
+            import certifi                      # the standard public certificates
+            ca = certifi.where()
+        except ImportError:
+            ca = None
+    return {"ssl": {"ca": ca}} if ca else {"ssl": {}}
+
+
 def get_db():
     if "db" not in g:
         g.db = pymysql.connect(
@@ -20,6 +35,7 @@ def get_db():
             charset="utf8mb4",
             cursorclass=DictCursor,
             autocommit=True,
+            **_ssl_options(),
         )
     return g.db
 

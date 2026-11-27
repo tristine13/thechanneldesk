@@ -4,6 +4,7 @@ Roles: Admin, Adviser, Editor-in-Chief, Editor, Staff.
 Run:   flask --app app run --debug
 """
 import json
+import mimetypes
 import os
 import re
 import secrets
@@ -17,7 +18,7 @@ from html import escape
 
 from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
-from flask import (Flask, abort, flash, jsonify, redirect, render_template, request,
+from flask import (Flask, Response, abort, flash, jsonify, redirect, render_template, request,
                    send_from_directory, session, url_for)
 from markupsafe import Markup
 from werkzeug.utils import secure_filename
@@ -38,7 +39,7 @@ app = Flask(__name__)
 from werkzeug.middleware.proxy_fix import ProxyFix  # noqa: E402
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.secret_key = os.getenv("SECRET_KEY", "dev-only-change-me")
-app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 4 * 1024 * 1024        # Vercel accepts request bodies up to about 4.5 MB
 # its own cookie name: the student site also runs on 127.0.0.1 and browsers share cookies across ports,
 # so a shared name made each site overwrite the other's session ("Invalid CSRF token")
 app.config["SESSION_COOKIE_NAME"] = "channeldesk_staff"
@@ -46,7 +47,10 @@ app.config["SESSION_COOKIE_SECURE"] = bool(os.getenv("VERCEL"))
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["UPLOAD_FOLDER"] = os.path.join(os.path.dirname(__file__), "uploads")
 app.teardown_appcontext(close_db)
-os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+try:                                        # read-only on Vercel: pictures are kept in the database there
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+except OSError:
+    pass
 ALLOWED_EXT = {"png", "jpg", "jpeg", "gif", "webp"}
 
 # type of work: used for tasks.type and for new posts.type
@@ -159,10 +163,37 @@ def approval_count():
     return row["n"]
 
 
+_image_table_ready = False
+
+
+def ensure_image_table():
+    """Uploaded pictures are kept in the database, so they work on Vercel (where files can't be saved)."""
+    global _image_table_ready
+    if _image_table_ready:
+        return
+    execute("CREATE TABLE IF NOT EXISTS image_files (name VARCHAR(255) NOT NULL PRIMARY KEY, "
+            "mime VARCHAR(100) NOT NULL, data MEDIUMBLOB NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+    _image_table_ready = True
+
+
+def serve_image(filename):
+    """A stored picture: from the database first, else from the old uploads folder."""
+    try:
+        ensure_image_table()
+        row = query("SELECT mime, data FROM image_files WHERE name = %s", (filename,), one=True)
+    except Exception:
+        row = None
+    if row:
+        return Response(row["data"], mimetype=row["mime"], headers={"Cache-Control": "private, max-age=86400"})
+    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+
+
 def save_images(post_id, files):
     files = [f for f in files if f and f.filename][:1]      # one image per article
     if files and "." in files[0].filename and files[0].filename.rsplit(".", 1)[-1].lower() in ALLOWED_EXT:
+        ensure_image_table()
         for old in query("SELECT image FROM post_images WHERE post_id = %s", (post_id,)):   # a new picture replaces the old one
+            execute("DELETE FROM image_files WHERE name = %s", (old["image"],))
             try:
                 os.remove(os.path.join(app.config["UPLOAD_FOLDER"], old["image"]))
             except OSError:
@@ -176,8 +207,9 @@ def save_images(post_id, files):
             flash(f"Skipped {f.filename}: unsupported file type.", "error")
             continue
         name = f"{uuid.uuid4().hex}_{secure_filename(f.filename)}"
-        f.save(os.path.join(app.config["UPLOAD_FOLDER"], name))
-        # the DB trigger `after_post_image_insert` keeps posts.image_count in sync
+        ensure_image_table()
+        execute("INSERT INTO image_files (name, mime, data) VALUES (%s, %s, %s)",
+                (name, mimetypes.guess_type(name)[0] or "application/octet-stream", f.read()))
         execute("INSERT INTO post_images (post_id, image) VALUES (%s, %s)", (post_id, name))
 
 
@@ -532,7 +564,7 @@ def logout():
 @app.route("/uploads/<path:filename>")
 @login_required
 def uploads(filename):
-    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+    return serve_image(filename)
 
 
 @app.route("/brand/logo.png")
@@ -758,6 +790,11 @@ def delete_draft(post_id):
         flash("Only drafts can be deleted.", "error")
         return redirect(url_for("submitted"))
     for row in query("SELECT image FROM post_images WHERE post_id = %s", (post_id,)):
+        try:
+            ensure_image_table()
+            execute("DELETE FROM image_files WHERE name = %s", (row["image"],))
+        except Exception:
+            pass
         try:
             os.remove(os.path.join(app.config["UPLOAD_FOLDER"], row["image"]))
         except OSError:
