@@ -19,7 +19,15 @@ ROLE_LABELS = {
 }
 # Roles an admin can hand out from the Admin Panel (Admin is NOT assignable)
 ASSIGNABLE_ROLES = [ADVISER, EIC, NEWS_EDITOR, STAFF]
-POSITIONS = ["Writer", "Photojournalist", "Layout Artist"]
+# Editorial beat / position, grouped by department (shown as a dropdown with department headings)
+POSITION_GROUPS = [
+    ("Editorial Board", ["Editor-in-Chief", "Managing Editor", "Associate Editor"]),
+    ("Writing Department", ["News Writer", "Feature Writer", "Editorial Writer", "Sports Writer",
+                           "Literary Writer", "Copyreader"]),
+    ("Creatives Department", ["Layout Artist", "Photojournalist", "Illustrator/Cartoonist"]),
+    ("Multimedia Department", ["Broadcaster", "Technical", "Scriptwriter"]),
+]
+POSITIONS = [p for _dept, _items in POSITION_GROUPS for p in _items]
 
 # posts.status enum:
 # draft, pending, with_eic, with_adviser, approved, rejected, revise

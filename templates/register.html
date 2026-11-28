@@ -19,13 +19,32 @@
         <label>Email</label>
         <input type="email" name="email" placeholder="Enter your Google email" value="{{ prefill.email }}" {{ 'readonly'
             if prefill.email }} required>
-        <label>Position</label>
-        <select name="position" required>
-            <option value="">Select a position</option>
-            {% for p in positions %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+        <label>Department</label>
+        <select id="pos-dept" required>
+            <option value="">Select a department</option>
+            {% for dept, items in position_groups %}<option value="{{ dept }}">{{ dept }}</option>{% endfor %}
+        </select>
+        <label>Editorial Beat / Position</label>
+        <select name="position" id="pos-item" required disabled>
+            <option value="">Select a department first</option>
         </select>
         <button type="submit" class="submit-btn">Register</button>
     </form>
     <div class="footer-right">The Channel<br>Desk.</div>
 </div>
+<script>
+    (function () {
+        var groups = {{ position_groups|tojson }};
+        var dept = document.getElementById('pos-dept'), item = document.getElementById('pos-item');
+        dept.addEventListener('change', function () {
+            item.innerHTML = '';
+            var g = groups.filter(function (x) { return x[0] === dept.value; })[0];
+            if (!g) { item.add(new Option('Select a department first', '')); item.disabled = true; return; }
+            item.add(new Option('Select a position', ''));
+            g[1].forEach(function (p) { item.add(new Option(p, p)); });
+            item.disabled = false;
+            item.focus();
+        });
+    })();
+</script>
 {% endblock %}

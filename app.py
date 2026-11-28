@@ -30,7 +30,7 @@ from mailer import email_html, send_mail  # noqa: E402
 import richtext  # noqa: E402
 from roles import (ACTION_LABELS, ADMIN, ADVISER, ANNOUNCE, APPROVE_LABELS,  # noqa: E402
                    ASSIGN_TASKS, ASSIGNABLE_ROLES, EDITABLE_STATUSES, EIC,
-                   NEWS_EDITOR, NEXT_STATUS, POSITIONS, REVIEWERS, ROLE_LABELS,
+                   NEWS_EDITOR, NEXT_STATUS, POSITION_GROUPS, POSITIONS, REVIEWERS, ROLE_LABELS,
                    ROLES, SEE_ALL_POSTS, STAFF, STAGE_REVIEWER, STATUS_LABELS, WORKERS,
                    can_act, login_required, roles_required, visible_stages)
 
@@ -504,7 +504,7 @@ def register():
         return redirect(url_for("index"))
 
     prefill = {"name": session.get("google_name", ""), "email": session.get("google_email", "")}
-    return render_template("register.html", positions=POSITIONS, prefill=prefill)
+    return render_template("register.html", position_groups=POSITION_GROUPS, prefill=prefill)
 
 
 @app.route("/login")
@@ -1390,7 +1390,7 @@ ROLE_CARDS = [
     (EIC, "Second-stage reviewer. Also assigns tasks and posts announcements."),
     (ADVISER, "Final approver before publishing. Also assigns tasks and posts announcements."),
 ]
-POSITION_SUGGESTIONS = ["Writer", "Cartoonist", "Layout Artist", "Sports Journalist", "Photojournalist"]
+# position choices come from roles.POSITION_GROUPS (grouped by department)
 INSTITUTION_DOMAIN = "@fbc.ph.education"
 
 
@@ -1409,7 +1409,7 @@ def admin_context(**extra):
                    query("SELECT status, COUNT(*) AS n FROM tasks GROUP BY status")}
     ctx = dict(pending=pending, members=members, post_counts=post_counts,
                task_counts=task_counts, role_cards=ROLE_CARDS,
-               position_suggestions=POSITION_SUGGESTIONS, domain=INSTITUTION_DOMAIN,
+               position_groups=POSITION_GROUPS, domain=INSTITUTION_DOMAIN,
                form={}, errors={}, open_drawer=False)
     ctx.update(extra)
     return ctx
@@ -1444,9 +1444,9 @@ def admin_create():
           or query("SELECT id FROM users WHERE email=%s", (email,), one=True)):
         errors["email"] = "An account with this email already exists (or is under Pending Approvals)."
     if not position:
-        errors["position"] = "Enter or pick a position."
-    elif len(position) > 60:
-        errors["position"] = "Keep the position under 60 characters."
+        errors["position"] = "Pick a position from the list."
+    elif position not in POSITIONS:
+        errors["position"] = "Pick a position from the list."
 
     if errors:   # re-open the drawer with what was typed and the messages
         return render_template("admin.html", **admin_context(

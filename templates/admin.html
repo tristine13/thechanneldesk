@@ -196,14 +196,25 @@
                     <p class="adm-hint">Must end in {{ domain }}</p>
                 </div>
 
+                {% set ns = namespace(dept='') %}
+                {% for dept, items in position_groups %}{% if form.position in items %}{% set ns.dept = dept %}{% endif %}{% endfor %}
+                <div class="adm-field">
+                    <label class="adm-lbl" for="f-dept">Department</label>
+                    <span class="adm-sel">
+                        <select id="f-dept">
+                            <option value="">Select a department</option>
+                            {% for dept, items in position_groups %}<option value="{{ dept }}" {{ 'selected' if ns.dept == dept }}>{{ dept }}</option>{% endfor %}
+                        </select>
+                    </span>
+                </div>
+
                 <div class="adm-field">
                     <label class="adm-lbl" for="f-pos">Editorial Beat / Position</label>
-                    <input id="f-pos" name="position" type="text" autocomplete="off" maxlength="60"
-                        placeholder="e.g. Writer" value="{{ form.position or '' }}"
-                        class="adm-inp {{ 'bad' if errors.position }}">
-                    <div class="adm-chips">
-                        {% for s in position_suggestions %}<button type="button" class="adm-chip" data-pos="{{ s }}">{{ s }}</button>{% endfor %}
-                    </div>
+                    <span class="adm-sel {{ 'bad' if errors.position }}">
+                        <select id="f-pos" name="position" data-selected="{{ form.position or '' }}" {{ 'disabled' if not ns.dept }}>
+                            <option value="">Select a department first</option>
+                        </select>
+                    </span>
                     {% if errors.position %}<p class="adm-err">{{ errors.position }}</p>{% endif %}
                 </div>
 
@@ -281,11 +292,20 @@
             if (drawer.classList.contains('open')) closeDrawer();
         });
 
-        // position quick-picks
-        var pos = document.getElementById('f-pos');
-        document.querySelectorAll('[data-pos]').forEach(function (c) {
-            c.addEventListener('click', function () { pos.value = c.getAttribute('data-pos'); pos.focus(); });
-        });
+        // two-step position pick: department first, then that department's positions
+        var groups = {{ position_groups|tojson }};
+        var deptSel = document.getElementById('f-dept'), posSel = document.getElementById('f-pos');
+        function fillPositions(keep) {
+            var g = groups.filter(function (x) { return x[0] === deptSel.value; })[0];
+            posSel.innerHTML = '';
+            if (!g) { posSel.add(new Option('Select a department first', '')); posSel.disabled = true; return; }
+            posSel.add(new Option('Select a position', ''));
+            g[1].forEach(function (p) { posSel.add(new Option(p, p, false, p === keep)); });
+            posSel.disabled = false;
+        }
+        deptSel.addEventListener('change', function () { fillPositions(''); posSel.focus(); });
+        fillPositions(posSel.getAttribute('data-selected'));
+
         // system role dropdown: shows the chosen role + summary, opens to the four options
         var dd = document.getElementById('role-dd');
         var ddBtn = dd.querySelector('.adm-dd-btn');
