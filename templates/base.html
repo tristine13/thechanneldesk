@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>{% block title %}The Channel Desk{% endblock %}</title>
     <link
         href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&family=Inter:wght@300;400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&display=swap"
@@ -39,6 +39,15 @@
         <img src="{{ url_for('static', filename='images/channellogo.png') }}" alt="Menu">
     </button>
     <div class="sidebar-scrim" onclick="document.body.classList.remove('sidebar-open')"></div>
+    <header class="m-top">
+        <button type="button" class="m-burger" onclick="toggleSidebar()" aria-label="Open menu">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+        <a class="m-brand" href="{{ url_for('dashboard') }}">
+            <img src="{{ url_for('static', filename='images/channellogo.png') }}" alt="">
+            <span>The Channel Desk</span>
+        </a>
+    </header>
     {% endif %}
 
     <div class="{{ 'app-shell' if session.user_id else '' }}">

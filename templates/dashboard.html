@@ -127,6 +127,71 @@
     .tl-empty b { display: block; font-family: var(--font-head); font-size: 20px; color: var(--tl-ink); margin-bottom: 4px; }
     .tl-empty button { margin-top: 10px; padding: 6px 12px; border: 1px solid var(--tl-line); border-radius: 6px; background: #fff; font: inherit; font-size: 13px; cursor: pointer; }
     @media (prefers-reduced-motion: reduce) { .tl-card, .tl-search input { transition: none; } .tl-card:hover { transform: none; } }
+
+    /* ---------- phone-only controls: hidden on desktop; the sheet's wrappers vanish so the desktop toolbar is exactly as before ---------- */
+    .tl-sheet, .tl-sheet-body { display: contents; }
+    .tl-sheet-head, .tl-sheet-foot, .tl-sheet-feat, .tl-filter-btn, .tl-sheet-bk { display: none; }
+
+    /* ---------- phones (< 768px) ---------- */
+    @media (max-width: 767px) {
+        .tl { padding-bottom: 76px; }
+        .tl-band { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 12px; align-items: center; padding: 16px 0 0; margin-bottom: 16px; }
+        .tl-band .tl-bar { display: contents; }
+        .tl-bar > .tl-group { display: contents; }
+
+        /* heading on the left, icon-only view switcher on the right */
+        .tl-head { grid-column: 1; grid-row: 1; margin: 0; min-width: 0; gap: 10px; }
+        .tl-head svg { width: 24px; height: 24px; }
+        .tl-head h1 { font-size: 26px; }
+        .tl-bar > .tl-group:first-child { display: inline-flex; flex-wrap: nowrap; gap: 0; grid-column: 2; grid-row: 1; padding: 3px; background: #EBE8E1; border-radius: 10px; }
+        .tl-view { width: 36px; height: 32px; padding: 0; gap: 0; justify-content: center; font-size: 0; border-radius: 8px; color: #6B6460; }
+        .tl-view svg { width: 18px; height: 18px; }
+        .tl-view:hover { background: transparent; }
+        .tl-view[aria-selected="true"] { background: #fff; color: var(--tl-maroon); box-shadow: 0 1px 2px rgba(0, 0, 0, .14); }
+
+        /* search + Filters on one 44px row */
+        .tl-search { grid-column: 1; grid-row: 2; width: 100%; }
+        .tl-search input, .tl-search input:focus { width: 100%; height: 44px; padding: 0 12px 0 40px; border-radius: 10px; font-size: 16px; }
+        .tl-search svg { left: 14px; width: 17px; height: 17px; }
+        .tl-filter-btn { display: inline-flex; position: relative; grid-column: 2; grid-row: 2; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border: 1px solid var(--tl-line); border-radius: 10px; background: #fff; color: var(--tl-ink); font: 600 14px var(--font-body); cursor: pointer; }
+        .tl-filter-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+        .tl-dot { display: none; position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--tl-maroon); }
+        .tl-filter-btn[data-active] .tl-dot { display: block; }
+
+        /* category tabs: swipeable, no scrollbar, 16px breathing room at the right edge */
+        .tl-band .tl-cats { grid-column: 1 / -1; grid-row: 3; flex-wrap: nowrap; margin: 0 -16px; padding: 0; }
+        .tl-tabs { width: 100%; overflow-x: auto; white-space: nowrap; padding-left: 16px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+        .tl-tabs::-webkit-scrollbar { display: none; }
+        .tl-tabs::after { content: ""; flex: 0 0 16px; }
+        .tl-tab { flex: none; padding: 12px 12px 10px; }
+
+        /* New Output becomes a floating button (below the menu drawer) */
+        .tl-band .tl-new { position: fixed; right: 16px; bottom: calc(20px + env(safe-area-inset-bottom)); z-index: 30; height: 48px; margin: 0; padding: 0 20px; border-radius: 999px; font-size: 15px; box-shadow: 0 6px 18px rgba(107, 15, 26, .35); }
+
+        /* Filters bottom sheet: sort, author, featured toggle */
+        .tl-sheet-bk { display: block; position: fixed; inset: 0; z-index: 39; background: rgba(20, 20, 20, .5); opacity: 0; visibility: hidden; transition: opacity .2s ease, visibility 0s linear .2s; }
+        .tl-sheet-bk.open { opacity: 1; visibility: visible; transition-delay: 0s; }
+        .tl-sheet { display: flex; flex-direction: column; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; max-height: 80vh; background: #fff; border-radius: 20px 20px 0 0; box-shadow: 0 -10px 30px rgba(0, 0, 0, .2); padding-bottom: env(safe-area-inset-bottom); transform: translateY(105%); visibility: hidden; transition: transform .28s cubic-bezier(.32, .72, 0, 1), visibility 0s linear .28s; }
+        .tl-sheet.open { transform: none; visibility: visible; transition-delay: 0s; }
+        .tl-sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 6px; }
+        .tl-sheet-head b { font-family: var(--font-head); font-size: 20px; }
+        .tl-sheet-x { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 50%; background: #F3F1EC; color: var(--tl-ink); cursor: pointer; }
+        .tl-sheet-x svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+        .tl-sheet-body { display: flex; flex-direction: column; gap: 12px; padding: 8px 20px 12px; overflow-y: auto; }
+        .tl-sheet .tl-ghost { width: 100%; height: 46px; padding: 0 34px 0 14px; border: 1px solid var(--tl-line); border-radius: 10px; background-color: #fff; color: var(--tl-ink); font-size: 16px; background-position: right 14px center; }
+        .tl-sheet-feat { display: flex; }
+        .tl-sheet-feat .tl-feat { display: flex; flex-direction: row-reverse; justify-content: space-between; width: 100%; height: 46px; margin: 0; padding: 0 14px; border: 1px solid var(--tl-line); border-radius: 10px; font-size: 15px; color: var(--tl-ink); }
+        .tl-sheet-foot { display: block; padding: 4px 20px 16px; }
+        .tl-sheet-done { width: 100%; height: 48px; border: 0; border-radius: 12px; background: var(--tl-maroon); color: #fff; font: 600 15px var(--font-body); cursor: pointer; }
+
+        .tl-cover { height: 190px; }
+        .tl::after { margin-top: 32px; font-size: 10px; letter-spacing: .06em; }
+        .tl-grid.is-board .tl-col { flex-basis: 82vw; }
+        .is-list .tl-foot { padding: 10px 12px; gap: 10px; }
+        .is-list .tl-body { padding: 10px 12px; gap: 10px; }
+        .is-list .tl-pill { flex-basis: 70px; }
+        .is-list .tl-meta { display: none; }
+    }
 </style>
 
 <div class="tl">
@@ -138,11 +203,15 @@
 
     <div class="tl-bar">
         <div class="tl-group" role="tablist" aria-label="View">
-            <button type="button" class="tl-view" role="tab" data-view="gallery" aria-selected="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Gallery View</button>
-            <button type="button" class="tl-view" role="tab" data-view="board" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="4" height="15" rx="1"/></svg>Board View</button>
-            <button type="button" class="tl-view" role="tab" data-view="list" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>List View</button>
+            <button type="button" class="tl-view" role="tab" data-view="gallery" aria-label="Gallery view" title="Gallery view" aria-selected="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Gallery View</button>
+            <button type="button" class="tl-view" role="tab" data-view="board" aria-label="Board view" title="Board view" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="4" height="15" rx="1"/></svg>Board View</button>
+            <button type="button" class="tl-view" role="tab" data-view="list" aria-label="List view" title="List view" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>List View</button>
         </div>
         <div class="tl-group">
+            <div class="tl-sheet-bk" id="tl-sheet-bk"></div>
+            <div class="tl-sheet" id="tl-sheet" role="dialog" aria-modal="true" aria-label="Filters">
+            <div class="tl-sheet-head"><b>Filters</b><button type="button" class="tl-sheet-x" id="tl-sheet-x" aria-label="Close filters"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+            <div class="tl-sheet-body">
             <select class="tl-ghost" id="tl-sort" aria-label="Sort">
                 <option value="new">Sort: Newest first</option>
                 <option value="old">Sort: Oldest first</option>
@@ -152,8 +221,13 @@
                 <option value="">Author: Everyone</option>
                 {% for a in authors %}<option value="{{ a|lower }}">{{ a }}</option>{% endfor %}
             </select>
+            <div class="tl-sheet-feat" id="tl-sheet-feat"></div>
+            </div>
+            <div class="tl-sheet-foot"><button type="button" class="tl-sheet-done" id="tl-sheet-done">Show stories</button></div>
+            </div>
             <label class="tl-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
                 <input type="search" id="tl-q" placeholder="Search" aria-label="Search stories"></label>
+            <button type="button" class="tl-filter-btn" id="tl-filter-btn" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>Filters<i class="tl-dot"></i></button>
             {% if session.role in WORKERS %}<a class="tl-new" href="{{ url_for('create') }}">+ New Output</a>{% endif %}
         </div>
     </div>
@@ -232,6 +306,8 @@
         });
         document.querySelectorAll('.tl-tab').forEach(function (t) { t.setAttribute('aria-selected', t.dataset.cat === st.cat ? 'true' : 'false'); });
         document.querySelectorAll('.tl-view').forEach(function (t) { t.setAttribute('aria-selected', t.dataset.view === st.view ? 'true' : 'false'); });
+        var fb = document.getElementById('tl-filter-btn');
+        if (fb) { if (st.author || st.sort !== 'new' || !st.feat) fb.setAttribute('data-active', ''); else fb.removeAttribute('data-active'); }
 
         var shown = cards.filter(function (c) { return matches(c, false); });
         shown.sort(function (a, b) {
@@ -281,6 +357,20 @@
     document.addEventListener('keydown', function (e) {
         if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); q.focus(); }
     });
+    // phones: the Featured toggle lives inside the Filters sheet; on wider screens it goes back beside the tabs
+    var featLabel = featBox.parentNode, featHome = featLabel.parentNode, featSlot = document.getElementById('tl-sheet-feat');
+    var mq = window.matchMedia('(max-width: 767px)');
+    function placeFeat() { (mq.matches ? featSlot : featHome).appendChild(featLabel); if (!mq.matches) closeSheet(); }
+    var sheet = document.getElementById('tl-sheet'), sheetBk = document.getElementById('tl-sheet-bk');
+    function openSheet() { sheet.classList.add('open'); sheetBk.classList.add('open'); }
+    function closeSheet() { sheet.classList.remove('open'); sheetBk.classList.remove('open'); }
+    document.getElementById('tl-filter-btn').addEventListener('click', openSheet);
+    document.getElementById('tl-sheet-x').addEventListener('click', closeSheet);
+    document.getElementById('tl-sheet-done').addEventListener('click', closeSheet);
+    sheetBk.addEventListener('click', closeSheet);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });
+    if (mq.addEventListener) mq.addEventListener('change', placeFeat); else mq.addListener(placeFeat);
+    placeFeat();
     apply();
 })();
 </script>
